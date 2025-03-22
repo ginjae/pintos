@@ -25,7 +25,7 @@ cat $PINTOSDIR/src/misc/bochs-2.2.6-gdbstub-ENN.patch | patch -p1
 if test "`uname -s`" = "SunOS"; then
     cat $PINTOSDIR/src/misc/bochs-2.2.6-solaris-link.patch | patch -p1
 fi
-CFGOPTS="--with-x --with-x11 --with-term --with-nogui --prefix=$DSTDIR"
+CFGOPTS="--enable-cpu-level=6 --with-x --with-x11 --with-term --with-nogui --prefix=$DSTDIR"
 mkdir plain &&
         cd plain && 
         ../configure $CFGOPTS --enable-gdb-stub && 
