@@ -28,6 +28,9 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+/* List of processes in sleeping state. */
+static struct list sleeping_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -247,6 +250,56 @@ thread_unblock (struct thread *t)
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
+  intr_set_level (old_level);
+}
+
+/* Compares "wake_me_up" tick between two thread. Made to utilize list sort. */
+bool
+thread_wake_me_up_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *ta = list_entry (a, struct thread, elem);
+  struct thread *tb = list_entry (b, struct thread, elem);
+  return ta->wake_me_at < tb->wake_me_at;
+}
+
+/* Put thread into a sleeping list */
+void
+thread_sleep (struct thread *t, int64_t ticks)
+{
+  enum intr_level old_level;
+
+  ASSERT (is_thread (t));
+
+  old_level = intr_disable ();
+  t->wake_me_at = ticks;
+  list_insert_ordered (&sleeping_list, &t->elem, thread_wake_me_up_less, NULL);
+  t->status = THREAD_BLOCKED;
+  intr_set_level (old_level);
+  schedule ();
+}
+
+/* Wake up sleeping thread */
+void
+wake_sleeping_thread(int64_t ticks)
+{
+  struct list_elem *e;
+  struct thread *t;
+
+  enum intr_level old_level;
+  old_level = intr_disable ();
+  for (e = list_begin (&sleeping_list); e != list_end (&sleeping_list); e = list_next (e))
+  {
+    t = list_entry (e, struct thread, elem);
+    if (t->wake_me_at <= ticks)
+    {
+      list_remove (&t->elem);
+      thread_unblock (t);
+    }
+    else
+    {
+      break;
+    }
+  }
   intr_set_level (old_level);
 }
 
