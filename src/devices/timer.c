@@ -92,7 +92,7 @@ timer_sleep (int64_t ticks)
   int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
-  printf("Thread  is going to sleep");
+  printf("Thread is going to sleep\n");
   struct thread *cur = thread_current ();
   cur->wake_me_at = start + ticks;
   

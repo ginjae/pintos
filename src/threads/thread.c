@@ -275,14 +275,16 @@ thread_sleep (struct thread *t, int64_t ticks)
   t->wake_me_at = ticks;
   list_insert_ordered (&sleeping_list, &t->elem, thread_wake_me_up_less, NULL);
   t->status = THREAD_BLOCKED;
-  intr_set_level (old_level);
   schedule ();
+  intr_set_level (old_level);
 }
 
 /* Wake up sleeping thread */
 void
 wake_sleeping_thread(int64_t ticks)
 {
+  if (list_empty (&sleeping_list))
+    return;
   struct list_elem *e;
   struct thread *t;
 
@@ -291,7 +293,7 @@ wake_sleeping_thread(int64_t ticks)
   for (e = list_begin (&sleeping_list); e != list_end (&sleeping_list); e = list_next (e))
   {
     t = list_entry (e, struct thread, elem);
-    if (t->wake_me_at <= ticks)
+    if (t->wake_me_at <= ticks && t->status == THREAD_BLOCKED)
     {
       list_remove (&t->elem);
       thread_unblock (t);
