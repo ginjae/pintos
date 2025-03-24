@@ -20,6 +20,8 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
+static bool SLEEPING = false;
+
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
@@ -89,14 +91,13 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
+  SLEEPING = true;
   int64_t start = timer_ticks ();
+  struct thread *cur;
 
   ASSERT (intr_get_level () == INTR_ON);
-  printf("Thread is going to sleep\n");
-  struct thread *cur = thread_current ();
-  cur->wake_me_at = start + ticks;
-  
-  thread_sleep (cur, cur->wake_me_at);
+  cur = thread_current ();
+  thread_sleep (cur, start + ticks);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -173,9 +174,17 @@ timer_print_stats (void)
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
-  ticks++;
-  thread_tick ();
+  if (!SLEEPING)
+  {
+    SLEEPING = true;
+    thread_tick ();
+    ticks++;
+  }
   wake_sleeping_thread(ticks);
+  // wake_sleeping_thread(ticks);
+  // wake_sleeping_thread(ticks);
+  SLEEPING = false;
+  return;
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
