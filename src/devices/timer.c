@@ -20,7 +20,8 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
-static bool SLEEPING = false;
+/* Whether we have awaken some sleeping threads. */
+static bool AWAKEN = false;
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
@@ -91,7 +92,7 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  SLEEPING = true;
+  AWAKEN = true;
   if (ticks == 1) {thread_yield(); return;}
   
   int64_t start = timer_ticks ();
@@ -177,14 +178,14 @@ timer_print_stats (void)
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
-  if (!SLEEPING)
+  if (!AWAKEN)
   {
-    SLEEPING = true;
+    AWAKEN = true;
     thread_tick ();
     ticks++;
   }
   
-  SLEEPING = wake_sleeping_thread(ticks);
+  AWAKEN = wake_sleeping_thread(ticks);
   return;
 }
 
