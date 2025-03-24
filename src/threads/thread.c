@@ -280,9 +280,14 @@ thread_sleep (struct thread *t, int64_t ticks)
 }
 
 /* Wake up sleeping thread */
-void
+bool
 wake_sleeping_thread(int64_t ticks)
 {
+  bool woken = false;
+
+  if (list_empty (&sleeping_list))
+    return woken;
+  
   struct list_elem *e;
   struct thread *t;
 
@@ -291,15 +296,16 @@ wake_sleeping_thread(int64_t ticks)
     t = list_entry (e, struct thread, elem);
     if (t->wake_me_at <= ticks && t->status == THREAD_BLOCKED)
     {
+      // printf("%s is waking up\n", t->name);
       list_remove (e);
       thread_unblock (t);
+      woken = true;
     }
     else
     {
-      return;
+      return woken;
     }
   }
-  
 }
 
 /* Returns the name of the running thread. */

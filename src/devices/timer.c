@@ -92,11 +92,14 @@ void
 timer_sleep (int64_t ticks) 
 {
   SLEEPING = true;
+  if (ticks == 1) {thread_yield(); return;}
+  
   int64_t start = timer_ticks ();
   struct thread *cur;
 
   ASSERT (intr_get_level () == INTR_ON);
   cur = thread_current ();
+  // printf("%s is going to sleep for %d ticks\n\n", cur->name, ticks);
   thread_sleep (cur, start + ticks);
 }
 
@@ -180,10 +183,8 @@ timer_interrupt (struct intr_frame *args UNUSED)
     thread_tick ();
     ticks++;
   }
-  wake_sleeping_thread(ticks);
-  // wake_sleeping_thread(ticks);
-  // wake_sleeping_thread(ticks);
-  SLEEPING = false;
+  
+  SLEEPING = wake_sleeping_thread(ticks);
   return;
 }
 
