@@ -74,7 +74,8 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
-/* Compares priority between two thread. Made to utilize list sort. */
+/* Compares priority between two thread. Made to utilize list sort.
+   It makes the ready list sort in the descening order of priority. */
 bool
 thread_priority_greater (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
@@ -222,7 +223,8 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  /* thread를 만들고 ready queue에 넣은 후, 확인 */
+  /* After the thread is added to ready queue, check if the
+     current thread should yield CPU. */
   thread_check_priority ();
 
   return tid;
@@ -409,18 +411,17 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
-/* priority 확인 후 ready queue에 priority가 더 큰 thread가 있으면 yield */
+/* Check if the current thread should yield CPU by comparing
+   the priority of the current thread and the priority of the
+   highest priority of thread in ready queue. If there is a
+   thread having higher priority in ready queue, then yield. */
 void
 thread_check_priority (void)
 {
   if (list_empty (&ready_list))
     return;
-  if (thread_get_priority () < list_entry (list_front (&ready_list), struct thread, elem)->priority) {
-    // printf("cur: %i\n", thread_get_priority ());
-    // printf("next: %i\n", list_entry (list_front (&ready_list), struct thread, elem)->priority);
-    // printf("yield because of priority\n");
+  if (thread_get_priority () < list_entry (list_front (&ready_list), struct thread, elem)->priority)
     thread_yield ();
-  }
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
@@ -428,6 +429,8 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  /* After setting the current thread's priority, check
+     if the current thread should yield cpu */
   thread_check_priority ();
 }
 
