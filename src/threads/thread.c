@@ -76,7 +76,7 @@ static tid_t allocate_tid (void);
 
 /* Compares priority between two thread. Made to utilize list sort. */
 bool
-thread_priority_more (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+thread_priority_greater (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
   struct thread *ta = list_entry (a, struct thread, elem);
   struct thread *tb = list_entry (b, struct thread, elem);
@@ -222,6 +222,9 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  /* thread를 만들고 ready queue에 넣은 후, 확인 */
+  thread_check_priority ();
+
   return tid;
 }
 
@@ -258,7 +261,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered (&ready_list, &t->elem, thread_priority_more, NULL);
+  list_insert_ordered (&ready_list, &t->elem, thread_priority_greater, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -382,8 +385,8 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
-    list_insert_ordered (&ready_list, &cur->elem, thread_priority_more, NULL);
+  if (cur != idle_thread)
+    list_insert_ordered (&ready_list, &cur->elem, thread_priority_greater, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -406,20 +409,26 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+/* priority 확인 후 ready queue에 priority가 더 큰 thread가 있으면 yield */
+void
+thread_check_priority (void)
+{
+  if (list_empty (&ready_list))
+    return;
+  if (thread_get_priority () < list_entry (list_front (&ready_list), struct thread, elem)->priority) {
+    // printf("cur: %i\n", thread_get_priority ());
+    // printf("next: %i\n", list_entry (list_front (&ready_list), struct thread, elem)->priority);
+    // printf("yield because of priority\n");
+    thread_yield ();
+  }
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) 
 {
-  int prev_priority = thread_get_priority ();
-    thread_current ()->priority = new_priority;
-  if (prev_priority > new_priority)
-  {
-    thread_yield ();
-  }
-  else
-  {
-    list_sort (&ready_list, thread_priority_more, NULL);
-  }
+  thread_current ()->priority = new_priority;
+  thread_check_priority ();
 }
 
 /* Returns the current thread's priority. */
@@ -545,7 +554,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-  list_insert_ordered (&all_list, &t->allelem, thread_priority_more, NULL);
+  list_insert_ordered (&all_list, &t->allelem, thread_priority_greater, NULL);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
