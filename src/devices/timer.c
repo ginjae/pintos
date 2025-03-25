@@ -92,7 +92,6 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  AWAKEN = true;
   if (ticks == 1) {thread_yield(); return;}
   
   int64_t start = timer_ticks ();
@@ -180,13 +179,11 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   if (!AWAKEN)
   {
-    AWAKEN = true;
     thread_tick ();
     ticks++;
   }
   
-  AWAKEN = wake_sleeping_thread(ticks);
-  return;
+  AWAKEN = thread_wake_sleeping(ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

@@ -270,7 +270,7 @@ thread_unblock (struct thread *t)
 
 /* Compares "wake_me_up" tick between two thread. Made to utilize list sort. */
 bool
-thread_wake_me_up_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+thread_wake_me_at_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
   struct thread *ta = list_entry (a, struct thread, elem);
   struct thread *tb = list_entry (b, struct thread, elem);
@@ -288,14 +288,14 @@ thread_sleep (struct thread *t, int64_t ticks)
   old_level = intr_disable ();
   t->status = THREAD_BLOCKED;
   t->wake_me_at = ticks;
-  list_insert_ordered (&sleeping_list, &t->elem, thread_wake_me_up_less, NULL);
+  list_insert_ordered (&sleeping_list, &t->elem, thread_wake_me_at_less, NULL);
   schedule ();
   intr_set_level (old_level);
 }
 
 /* Wake up sleeping thread */
 bool
-wake_sleeping_thread(int64_t ticks)
+thread_wake_sleeping(int64_t ticks)
 {
   bool woken = false;
 
