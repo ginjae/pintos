@@ -279,10 +279,11 @@ thread_wake_me_at_less (const struct list_elem *a, const struct list_elem *b, vo
 
 /* Put thread into a sleeping list */
 void
-thread_sleep (struct thread *t, int64_t ticks)
+thread_sleep (int64_t ticks)
 {
   enum intr_level old_level;
 
+  struct thread *t = thread_current ();
   ASSERT (is_thread (t));
 
   old_level = intr_disable ();

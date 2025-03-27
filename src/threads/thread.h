@@ -121,7 +121,7 @@ void thread_block (void);
 void thread_unblock (struct thread *);
 
 list_less_func thread_wake_me_up_less;
-void thread_sleep (struct thread *t, int64_t ticks);
+void thread_sleep (int64_t ticks);
 bool thread_wake_sleeping(int64_t ticks);
 
 struct thread *thread_current (void);

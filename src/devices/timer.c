@@ -21,7 +21,7 @@
 static int64_t ticks;
 
 /* Whether we have awaken some sleeping threads. */
-static bool AWAKEN = false;
+static bool awaken = false;
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
@@ -95,12 +95,10 @@ timer_sleep (int64_t ticks)
   if (ticks == 1) {thread_yield(); return;}
   
   int64_t start = timer_ticks ();
-  struct thread *cur;
 
   ASSERT (intr_get_level () == INTR_ON);
-  cur = thread_current ();
   // printf("%s is going to sleep for %d ticks\n\n", cur->name, ticks);
-  thread_sleep (cur, start + ticks);
+  thread_sleep (start + ticks);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -177,13 +175,13 @@ timer_print_stats (void)
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
-  if (!AWAKEN)
+  if (!awaken)
   {
     thread_tick ();
     ticks++;
   }
   
-  AWAKEN = thread_wake_sleeping(ticks);
+  awaken = thread_wake_sleeping(ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
