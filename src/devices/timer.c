@@ -181,7 +181,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
     ticks++;
   }
   
-  awaken = thread_wake_sleeping(ticks);
+  awaken = thread_wake_sleeping (ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
