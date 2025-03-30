@@ -84,6 +84,15 @@ thread_priority_greater (const struct list_elem *a, const struct list_elem *b, v
   return ta->priority > tb->priority;
 }
 
+/* Compares "wake_me_up" tick between two thread. Made to utilize list sort. */
+bool
+thread_wake_me_at_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *ta = list_entry (a, struct thread, elem);
+  struct thread *tb = list_entry (b, struct thread, elem);
+  return ta->wake_me_at < tb->wake_me_at;
+}
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -266,15 +275,6 @@ thread_unblock (struct thread *t)
   list_insert_ordered (&ready_list, &t->elem, thread_priority_greater, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
-}
-
-/* Compares "wake_me_up" tick between two thread. Made to utilize list sort. */
-bool
-thread_wake_me_at_less (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
-{
-  struct thread *ta = list_entry (a, struct thread, elem);
-  struct thread *tb = list_entry (b, struct thread, elem);
-  return ta->wake_me_at < tb->wake_me_at;
 }
 
 /* Put thread into a sleeping list */

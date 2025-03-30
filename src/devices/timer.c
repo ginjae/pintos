@@ -92,7 +92,11 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  if (ticks == 1) {thread_yield(); return;}
+  if (ticks == 1) 
+  {
+    thread_yield(); 
+    return;
+  }
   
   int64_t start = timer_ticks ();
 
