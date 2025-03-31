@@ -163,14 +163,28 @@ For PRIORITY SCHEDULING, we just added two functions.
 
 1. bool thread_priority_greater
 (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
-→ When a thread is inserted in ‘ready_list’, the ‘ready_list’ can keep
+-> When a thread is inserted in ‘ready_list’, the ‘ready_list’ can keep
 the descending order ofthreads’ priority using ‘list_insert_order’ 
 function with this comparison function.
 
 2. void thread_check_priority (void);
-→ The current-running thread yields the CPU when the priority of the
+-> The current-running thread yields the CPU when the priority of the
 thread with the highest priority in ‘ready_list’ is greater than the
 current-running thread’s priority.
+
+Then, we modify some functions.
+
+1. void thread_unblock (void) & void thread_yield (void)
+-> We use list_insert_ordered function with thread_priority_greater
+instead of list_push_back function for the current thread to move to
+'ready_list'.
+
+2. void thread_set_priority (int new_priority) & 
+      tid_t thread_create (const char *name, int priority,
+            thread_func *function, void *aux)
+-> At the end of that functions, we add thread_check_priority function
+to yield the CPU immediately if the current thread's priority is lower
+than the highest priority of thread in 'ready_list'. 
 
 >> B2: Explain the data structure used to track priority donation.
 >> Use ASCII art to diagram a nested donation.  (Alternately, submit a
