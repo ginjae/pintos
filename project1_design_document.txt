@@ -26,7 +26,7 @@ implementation. Overall code cleanup and improvement on code readability.
 Munseong Son: Implemented Alarm clock & general idea of list sorting 
 and comparison function.
 
--> 50:50 contribution.
+-> 60:40 contribution.
 
            ALARM CLOCK
            ===========
@@ -50,24 +50,19 @@ current thread is pushed into this list.
 -> Put current thread into sleep, with assigning "wake_me_at" tick
 to that thread.
 
-4. bool thread_wake_sleeping(int64_t ticks);
+4. void thread_wake_sleeping(int64_t ticks);
 -> Search through sleeping_list to wake sleeping threads that have
-less "wake_me_at" than current tick. Returns boolean for whether
-any thread is "awaken" or not.
+less "wake_me_at" than current tick.
 
 
 // timer.c
-1. static bool awaken = false;
--> Boolean indicating whether we awaken thread in this tick or not.
-Declared to avoid race conditions.
 
-2. timer_sleep (int64_t ticks);
+1. timer_sleep (int64_t ticks);
 -> Put current thread into sleep for [ticks]. If ticks == 1, then
 it just calls thread_yield(). Otherwise, it calls thread_sleep.
 
-3. static void timer_interrupt (struct intr_frame *args UNUSED);
--> Update tick & calls thread_tick(); if no thread is awaken in this
-tick. Calls thread_wake_sleeping & update awaken.
+2. static void timer_interrupt (struct intr_frame *args UNUSED);
+-> Update tick & calls thread_tick(); Calls thread_wake_sleeping.
 
 
 ---- ALGORITHMS ----
@@ -95,16 +90,10 @@ Since it is sorted in ascending order, thread_wake_sleeping checks the list
 until it meets a sleeping thread that has greater "wake_me_at" value than 
 current OS tick or until it reaches the end of that list.
 
-After that, thread_wake_sleeping returns whether it woken up any sleeping
-thread. timer_interrupt records this result into boolean "awaken",
-which is boolean for deciding if interrupt handler should update the
-OS tick in the next interrupt.
-
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
 
-thread_tick() call & tick update is minimized via utilizing "awaken"
-boolean. Also, thread_wake_sleeping function is optimized by making it
+thread_wake_sleeping function is optimized by making it
 return as soon as possible if sleeping_list is empty.
 
 Except those changes (which are essential to avoid race conditions),
@@ -135,11 +124,10 @@ thread_wake_sleeping function should take O(1) time, or take O(n) time &
 reduces sleeping_list by O(n), further optimizing future function calls.
 
 
-// "awaken" boolean
-awaken boolean exists to stop timer_interrupt from updating the tick
-if any of the sleeping thread is awaken. Otherwise, tick is updated
-while thread_wake_sleeping is called, preventing thread from awaken
-simultaneously.
+// Synchronization design
+
+Synchronization is achieved by utilizing while loop in the 
+thread_wake_sleeping() function.
 
 Default solution for this was calling thread_yield() until specified
 ticks. It "solves" this problem by just stopping every thread from
@@ -148,6 +136,11 @@ running, resulting a busy loop.
 Other possible solution was just calling thread_wake_sleeping multiple
 times in one timer_interrupt, which is far from optimized design for 
 obvious reasons.
+
+Another one is implementing: awaken boolean, which stops timer_interrupt 
+from updating the tick if any of the sleeping thread is awaken. 
+Otherwise, tick is updated while thread_wake_sleeping is called, 
+preventing thread from awaken simultaneously.
 
 
        PRIORITY SCHEDULING
