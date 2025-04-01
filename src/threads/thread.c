@@ -306,13 +306,16 @@ thread_wake_sleeping(int64_t ticks)
   struct list_elem *e;
   struct thread *t;
 
-  for (e = list_begin (&sleeping_list); e != list_end (&sleeping_list); e = list_next (e))
+  while (!list_empty (&sleeping_list))
+  // for (e = list_begin (&sleeping_list); e != list_end (&sleeping_list); e = list_next (e))
   {
-    t = list_entry (e, struct thread, elem);
+    t = list_entry (list_front (&sleeping_list), struct thread, elem);
+    // t = list_entry (e, struct thread, elem);
     if (t->wake_me_at <= ticks && t->status == THREAD_BLOCKED)
     {
       // printf("%s is waking up\n", t->name);
-      list_remove (e);
+      list_pop_front (&sleeping_list);
+      // list_remove (e);
       thread_unblock (t);
       woken = true;
     }

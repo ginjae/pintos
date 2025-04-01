@@ -179,11 +179,11 @@ timer_print_stats (void)
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
-  if (!awaken)
-  {
+  // if (!awaken)
+  // {
     thread_tick ();
     ticks++;
-  }
+  // }
   
   awaken = thread_wake_sleeping (ticks);
 }
