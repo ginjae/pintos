@@ -20,10 +20,10 @@ Munseong Son <osoli6949@unist.ac.kr>
 >> preparing your submission, other than the Pintos documentation, course
 >> text, lecture notes, and course staff.
 
-Jaemin Kim: Implemented priority handling. Advice & feedback on both 
+Jaemin Kim (60%): Implemented priority handling. Advice & feedback on both 
 implementation. Overall code cleanup and improvement on code readability.
 
-Munseong Son: Implemented Alarm clock & general idea of list sorting 
+Munseong Son(40%): Implemented Alarm clock & general idea of list sorting 
 and comparison function.
 
 -> 60:40 contribution.
