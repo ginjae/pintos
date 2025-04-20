@@ -38,6 +38,7 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  // To pass only command name instead of the whole line with arguments
   char *command, *save_ptr;
   command = strtok_r (file_name, " ", &save_ptr);
 
@@ -156,7 +157,9 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  // for debugging
+  // To prevent Pintos from terminating
+  // before user processes run and exit properly.
+  // This will be modified in project 2-1.
   volatile int i;
   for (i = 0; i < 1000000; i++);
 
