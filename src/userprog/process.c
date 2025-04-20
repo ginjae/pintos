@@ -45,24 +45,89 @@ process_execute (const char *file_name)
   return tid;
 }
 
+/* A function that pushes arguments to the user stack. */
+void
+push_argv(int argc, char **argv, void **esp) {
+  int i;
+
+  // push argv[i]
+  for (i = argc - 1; i >= 0; i--) {
+    int len = strlen(argv[i]) + 1;
+    *esp -= len;
+    strlcpy(*esp, argv[i], len);
+    argv[i] = *esp;
+  }
+  
+  // word-align
+  uintptr_t align = (uintptr_t)(*esp) % 4;
+  if (align) {
+    *esp -= align;
+    **(uint8_t **)esp = 0;
+  }
+
+  // argv[argc]: null pointer sentinel
+  *esp -= 4;
+  **(uint32_t **)esp = 0;
+
+  // push pointer to argv[i]
+  for (i = argc - 1; i >= 0;  i--) {
+    *esp -= 4;
+    **(uint32_t **)esp = argv[i];
+  }
+
+  // push pointer to argv
+  *esp -= 4;
+  **(uint32_t **)esp = *esp + 4;
+
+  // push argc
+  *esp -= 4;
+  **(uint32_t **)esp = argc;
+
+  // push fake return address
+  *esp -= 4;
+  **(uint32_t **)esp = 0;
+
+  // for debugging
+  hex_dump(*esp, *esp, 100, 1);
+}
+
 /* A thread function that loads a user process and starts it
    running. */
 static void
 start_process (void *file_name_)
 {
-  char *file_name = file_name_;
+  // char *file_name = file_name_;
+  char file_name[256];  // FIXME : 256???
+  strlcpy(file_name, file_name_, strlen(file_name_) + 1);
   struct intr_frame if_;
   bool success;
+
+  // char *command, *save_ptr;
+  // command = strtok_r (file_name_, " ", &save_ptr);
+  // printf("\n\n%s\n\n\n", command);
+
+  // Get argc & argv
+  int argc = 0;
+  char *argv[256];  // FIXME : 256???
+  char *token, *save_ptr;
+  for (token = strtok_r (file_name, " ", &save_ptr); token != NULL;
+      token = strtok_r (NULL, " ", &save_ptr))
+    argv[argc++] = token;
+  // printf("\n\n%s\n\n\n", argv[0]);
+  // printf("\n\n%s\n\n\n", argv[1]);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  success = load (argv[0], &if_.eip, &if_.esp);
+
+  if (success)
+    push_argv(argc, argv, &if_.esp);
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
+  palloc_free_page (file_name_);
   if (!success) 
     thread_exit ();
 
@@ -88,6 +153,10 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  // for debugging
+  int i;
+  for (i = 0; i < 100000000000; i++);
+
   return -1;
 }
 
