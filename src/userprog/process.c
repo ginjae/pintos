@@ -88,7 +88,7 @@ push_argv(int argc, char **argv, void **esp) {
   **(uint32_t **)esp = 0;
 
   // for debugging
-  hex_dump(*esp, *esp, 100, 1);
+  // hex_dump(*esp, *esp, 100, 1);
 }
 
 /* A thread function that loads a user process and starts it
@@ -154,8 +154,8 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
   // for debugging
-  int i;
-  for (i = 0; i < 100000000000; i++);
+  volatile int i;
+  for (i = 0; i < 1000000; i++);
 
   return -1;
 }
