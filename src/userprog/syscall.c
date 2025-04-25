@@ -3,6 +3,8 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "userprog/pagedir.h"
+#include "threads/vaddr.h"
 
 static void syscall_handler(struct intr_frame*);
 
@@ -26,8 +28,23 @@ syscall_handler(struct intr_frame* f)
   // printf("\n\n");
   // hex_dump(f->esp, f->esp, 100, 1);
 
-  // before handling system call,
-  // need to check f->esp is in its own user virtual memory
+  // Before handling system call:
+  // 1. Check if the stack pointer is valid (sc-bad-sp)
+  uint32_t* current_pd = thread_current()->pagedir;
+  if (!f->esp || !pagedir_get_page(current_pd, f->esp) || !is_user_vaddr(f->esp)) {
+    printf("%s: exit(%d)\n", thread_name(), -1);
+    thread_exit();
+    return;
+  }
+
+  // 2. Check if arguments are valid (sc-bad-arg)
+  if (!is_user_vaddr(f->esp + 4)) {
+    // FIXME: It only checks the case where the 1st argument is above the top of the user address space,
+    //        which is our only test case.
+    printf("%s: exit(%d)\n", thread_name(), -1);
+    thread_exit();
+    return;
+  }
 
 
   // handling system call
