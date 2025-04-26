@@ -10,10 +10,41 @@
 
 static void syscall_handler(struct intr_frame*);
 
+static struct file* fd_table[128]; // FIXME: 128 is arbitrary.
+
 void
 syscall_init(void)
 {
   intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
+}
+
+int open(const char* file) {
+  int i;
+  struct file* f = filesys_open(file);
+  if (f == NULL) {
+    return -1; // error
+  }
+  for (i = 0; i < 128; i++) {
+    if (fd_table[i] == NULL) {
+      fd_table[i] = f;
+      // Note: table index = fd - 2
+      return i + 2;
+    }
+  }
+}
+
+void close(int fd) {
+  int table_index = fd - 2;
+  if (table_index < 0 || table_index > 127 || fd_table[table_index] == NULL) {
+    printf("%s: exit(%d)\n", thread_name(), -1);
+    thread_exit();
+    return;
+  }
+  else {
+    file_close(fd_table[table_index]);
+    fd_table[table_index] = NULL;
+    return;
+  }
 }
 
 int write(int fd, void* buffer, unsigned size) {
@@ -71,11 +102,17 @@ syscall_handler(struct intr_frame* f)
     break;
 
   case SYS_OPEN:
-    // do something
+    if (!pagedir_get_page(current_pd, *(uint32_t*)(f->esp + 4))) {
+      printf("%s: exit(%d)\n", thread_name(), -1);
+      f->eax = -1; // return -1 (error)
+      thread_exit();
+      return;
+    }
+    f->eax = open((const char*)*(uint32_t*)(f->esp + 4));
     break;
 
   case SYS_CLOSE:
-    // do something
+    close((int)*(uint32_t*)(f->esp + 4));
     break;
 
   case SYS_WRITE:
