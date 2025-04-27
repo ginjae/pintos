@@ -7,6 +7,7 @@
 #include "threads/vaddr.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "devices/shutdown.h"
 
 static void syscall_handler(struct intr_frame*);
 
@@ -18,7 +19,7 @@ syscall_init(void)
   intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
-int open(const char* file) {
+int open(const char *file) {
   int i;
   struct file* f = filesys_open(file);
   if (f == NULL) {
@@ -31,6 +32,7 @@ int open(const char* file) {
       return i + 2;
     }
   }
+  return -1;
 }
 
 void close(int fd) {
@@ -47,7 +49,7 @@ void close(int fd) {
   }
 }
 
-int write(int fd, void* buffer, unsigned size) {
+int write(int fd, void *buffer, unsigned size) {
   if (fd == 1) {
     putbuf(buffer, size);
     return size;
@@ -55,45 +57,56 @@ int write(int fd, void* buffer, unsigned size) {
   return -1;
 }
 
+/* A function which checks if a virtual address is valid.
+   If not, the thread exits with exit code -1 */
+void check_valid(void *addr) {
+  uint32_t* current_pd = thread_current()->pagedir;
+  if (!addr || !is_user_vaddr(addr) || !pagedir_get_page(current_pd, addr)) {
+    printf("%s: exit(%d)\n", thread_name(), -1);
+    thread_exit();
+    return;
+  }
+}
+
 static void
 syscall_handler(struct intr_frame* f)
 {
   // Before handling system call:
-  // 1. Check if the stack pointer is valid (sc-bad-sp)
-  uint32_t* current_pd = thread_current()->pagedir;
-  if (!f->esp || !pagedir_get_page(current_pd, f->esp) || !is_user_vaddr(f->esp)) {
-    printf("%s: exit(%d)\n", thread_name(), -1);
-    thread_exit();
-    return;
-  }
+  // Check if the stack pointer is valid (sc-bad-sp)
+  check_valid(f->esp);
 
-  // 2. Check if arguments are valid (sc-bad-arg)
-  if (!is_user_vaddr(f->esp + 4)) {
-    printf("%s: exit(%d)\n", thread_name(), -1);
-    thread_exit();
-    return;
-  }
+  // Check if arguments are valid (sc-bad-arg)
+  // -> in the cases of switch statement
+
+  // if (!is_user_vaddr(f->esp + 4)) {
+  //   printf("%s: exit(%d)\n", thread_name(), -1);
+  //   thread_exit();
+  //   return;
+  // }
 
   // handling system call
-  switch (*(uint32_t*)f->esp) {
+  switch (*(uint32_t *)f->esp) {
 
   case SYS_HALT:
     shutdown_power_off();
     break;
 
   case SYS_EXIT:
-    printf("%s: exit(%d)\n", thread_name(), *(uint32_t*)(f->esp + 4));
+    check_valid(f->esp + 4);
+    printf("%s: exit(%d)\n", thread_name(), *(uint32_t *)(f->esp + 4));
     thread_exit();
     break;
 
   case SYS_CREATE:
-    if (!pagedir_get_page(current_pd, *(uint32_t*)(f->esp + 4))) {
+    if (!pagedir_get_page((uint32_t *)thread_current()->pagedir, (const void *)*(uint32_t *)(f->esp + 4))) {
       printf("%s: exit(%d)\n", thread_name(), -1);
       f->eax = 0; // return 0 (false)
       thread_exit();
       return;
     }
-    if (filesys_create((const char*)*(uint32_t*)(f->esp + 4), (unsigned)*((uint32_t*)(f->esp + 8)))) {
+    check_valid(f->esp + 4);
+    check_valid(f->esp + 8);
+    if (filesys_create((const char *)*(uint32_t *)(f->esp + 4), (unsigned)*((uint32_t *)(f->esp + 8)))) {
       f->eax = 1; // return 1 (true)
     }
     else {
@@ -102,23 +115,28 @@ syscall_handler(struct intr_frame* f)
     break;
 
   case SYS_OPEN:
-    if (!pagedir_get_page(current_pd, *(uint32_t*)(f->esp + 4))) {
+    if (!pagedir_get_page((uint32_t *)thread_current()->pagedir, (const void *)*(uint32_t *)(f->esp + 4))) {
       printf("%s: exit(%d)\n", thread_name(), -1);
       f->eax = -1; // return -1 (error)
       thread_exit();
       return;
     }
-    f->eax = open((const char*)*(uint32_t*)(f->esp + 4));
+    check_valid(f->esp + 4);
+    f->eax = open((const char *)*(uint32_t *)(f->esp + 4));
     break;
 
   case SYS_CLOSE:
-    close((int)*(uint32_t*)(f->esp + 4));
+    check_valid(f->esp + 4);
+    close((int)*(uint32_t *)(f->esp + 4));
     break;
 
   case SYS_WRITE:
-    f->eax = write((int)*(uint32_t*)(f->esp + 4),
-              (void*)*(uint32_t*)(f->esp + 8),
-              (unsigned)*((uint32_t*)(f->esp + 12)));
+    check_valid(f->esp + 4);
+    check_valid(f->esp + 8);
+    check_valid(f->esp + 12);
+    f->eax = write((int)*(uint32_t *)(f->esp + 4),
+              (void *)*(uint32_t *)(f->esp + 8),
+              (unsigned)*((uint32_t *)(f->esp + 12)));
     break;
 
   default:
