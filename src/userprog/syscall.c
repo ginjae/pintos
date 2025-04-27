@@ -50,7 +50,7 @@ void close(int fd) {
 int write(int fd, void* buffer, unsigned size) {
   if (fd == 1) {
     putbuf(buffer, size);
-    return size;  // FIXME
+    return size;
   }
   return -1;
 }
@@ -116,8 +116,9 @@ syscall_handler(struct intr_frame* f)
     break;
 
   case SYS_WRITE:
-    write((int)*(uint32_t*)(f->esp + 4), (void*)*(uint32_t*)(f->esp + 8),
-      (unsigned)*((uint32_t*)(f->esp + 12)));
+    f->eax = write((int)*(uint32_t*)(f->esp + 4),
+              (void*)*(uint32_t*)(f->esp + 8),
+              (unsigned)*((uint32_t*)(f->esp + 12)));
     break;
 
   default:

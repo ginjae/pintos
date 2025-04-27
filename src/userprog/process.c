@@ -101,24 +101,25 @@ static void
 start_process (void *file_name_)
 {
   // char *file_name = file_name_;
-  char file_name[256];  // FIXME : 256???
+  char *file_name = malloc(sizeof(char) * (strlen(file_name_) + 1));
   strlcpy(file_name, file_name_, strlen(file_name_) + 1);
   struct intr_frame if_;
   bool success;
 
-  // char *command, *save_ptr;
-  // command = strtok_r (file_name_, " ", &save_ptr);
-  // printf("\n\n%s\n\n\n", command);
-
-  // Get argc & argv
+  // Count argc first and allocate argv array
   int argc = 0;
-  char *argv[256];  // FIXME : 256???
   char *token, *save_ptr;
   for (token = strtok_r (file_name, " ", &save_ptr); token != NULL;
       token = strtok_r (NULL, " ", &save_ptr))
-    argv[argc++] = token;
-  // printf("\n\n%s\n\n\n", argv[0]);
-  // printf("\n\n%s\n\n\n", argv[1]);
+    argc++;
+  char **argv = malloc(sizeof(char *) * argc);
+
+  // Get the values of argv array
+  strlcpy(file_name, file_name_, strlen(file_name_) + 1);
+  int i = 0;
+  for (token = strtok_r (file_name, " ", &save_ptr); token != NULL;
+      token = strtok_r (NULL, " ", &save_ptr))
+    argv[i++] = token;
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -132,6 +133,8 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name_);
+  free(file_name);
+  free(argv);
   if (!success) 
     thread_exit ();
 
