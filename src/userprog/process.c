@@ -17,6 +17,8 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
+#include "devices/timer.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -39,18 +41,21 @@ process_execute (const char *file_name)
   strlcpy (fn_copy, file_name, PGSIZE);
 
   // To pass only command name instead of the whole line with arguments
-  char *command, *save_ptr;
-  command = strtok_r (file_name, " ", &save_ptr);
+  char *command = malloc(sizeof(char) * (strlen(file_name) + 1));
+  strlcpy (command, file_name, strlen(file_name) + 1);
+  char *save_ptr;
+  strtok_r (command, " ", &save_ptr);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (command, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
+  free(command);
   return tid;
 }
 
 /* A function that pushes arguments to the user stack. */
-void
+static void
 push_argv(int argc, char **argv, void **esp) {
   int i;
 
@@ -163,8 +168,9 @@ process_wait (tid_t child_tid UNUSED)
   // To prevent Pintos from terminating
   // before user processes run and exit properly.
   // This will be modified in project 2-1.
-  volatile int i;
-  for (i = 0; i < 1000000; i++);
+  timer_msleep(3000);
+  // volatile int i;
+  // for (i = 0; i < 1000000; i++);
 
   return -1;
 }
