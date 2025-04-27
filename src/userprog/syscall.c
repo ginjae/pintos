@@ -11,7 +11,7 @@
 
 static void syscall_handler(struct intr_frame*);
 
-static struct file* fd_table[128]; // FIXME: 128 is arbitrary.
+// static struct file* fd_table[128]; // FIXME: 128 is arbitrary.
 
 void
 syscall_init(void)
@@ -20,6 +20,7 @@ syscall_init(void)
 }
 
 int open(const char *file) {
+  struct file** fd_table = thread_current()->fd_table;
   int i;
   struct file* f = filesys_open(file);
   if (f == NULL) {
@@ -36,6 +37,7 @@ int open(const char *file) {
 }
 
 void close(int fd) {
+  struct file** fd_table = thread_current()->fd_table;
   int table_index = fd - 2;
   if (table_index < 0 || table_index > 127 || fd_table[table_index] == NULL) {
     printf("%s: exit(%d)\n", thread_name(), -1);
