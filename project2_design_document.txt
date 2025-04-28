@@ -29,19 +29,55 @@ Munseong Son <osoli6949@unist.ac.kr>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+-> No additional declaration of type or global / static variable.
+
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe how you implemented argument parsing.  How do
 >> you arrange for the elements of argv[] to be in the right order?
 >> How do you avoid overflowing the stack page?
 
+-> Slicing the input string into separate arguments is done using
+   strtok_r(). After slicing & counting argument number, we plug 
+   the result and thread's stack pointer into push_argv function.
+
+   push_argv function put the arguments on the stack before execution, 
+   by using for loop and strlcpy(). This is done by moving stack 
+   pointer *esp and copying strings of argv[] into *esp.
+
+   After word-aligning the pointer by subtracting (*esp) % 4,
+   we push each arguments into stack including null pointer 
+   sentinel in argv[argc] and argv[0].
+
+   Then we push argv and (pointer to) argc. Finally we push
+   fake "return address" to ensure the stack frame's structural
+   consistency.
+
+-> Stack overflow is avoided by copying address value to the 
+   variable sp_int, subtracting predicted amount of pointer
+   "movement" and calling is_user_vaddr((void*)sp_int).
+   This checks if stack pointer goes beyond the stack page
+   after performing push.
+
+
 ---- RATIONALE ----
 
 >> A3: Why does Pintos implement strtok_r() but not strtok()?
 
+-> strtok() uses global data, so it is unsafe in threaded programs
+   such as kernels. So, Pintos implement strtok_r(), which takes
+   additional argument instead using global variable.
+
 >> A4: In Pintos, the kernel separates commands into a executable name
 >> and arguments.  In Unix-like systems, the shell does this
 >> separation.  Identify at least two advantages of the Unix approach.
+
+-> By performing separation in shell instead of kernel, UNIX provides
+   protection between kernel and spliting argument, leading to better security.
+
+   Also, by having less function in the kernel, UNIX simplifies kernel
+   and maximizes extensibillity by removing potential conflict between
+   kernel's separation implementation and other functions from user & kernel.
 
                  SYSTEM CALLS
                  ============
@@ -52,35 +88,44 @@ Munseong Son <osoli6949@unist.ac.kr>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+-> 1. struct file* fd_table[FD_TABLE_SIZE]:
+    Thread member array. Stores file pointer in the index fd.
+    (fd = file descriptors)
+
+   2. #define FD_TABLE_SIZE 130
+    Maximum number + 2 of opened file per process. 2 is reserved for
+    stdin (fd 0) and stdout (fd 1), although open() never return these
+    two values.
+
 >> B2: Describe how file descriptors are associated with open files.
 >> Are file descriptors unique within the entire OS or just within a
 >> single process?
+
+-> File descriptors are unique just within a single process. Each file
+   descriptor is an index for per-process "fd_table", which stores 
+   pointers to corresponding opened file.
 
 ---- ALGORITHMS ----
 
 >> B5: Briefly describe your implementation of the "wait" system call
 >> and how it interacts with process termination.
 
-               SURVEY QUESTIONS
-               ================
+-> Put the current thread into sleep by 3 seconds. After that, return -1.
+   This implementation prevents Pintos & parent process terminate before
+   chile process does, and ensure that Pintos actually terminates after
+   some time.
 
-Answering these questions is optional, but it will help us improve the
-course in future quarters.  Feel free to tell us anything you
-want--these questions are just to spur your thoughts.  You may also
-choose to respond anonymously in the course evaluations at the end of
-the quarter.
+   (Original implementation just used while(1), which prevented Pintos
+   from termintation, forever.)
 
->> In your opinion, was this assignment, or any one of the three problems
->> in it, too easy or too hard?  Did it take too long or too little time?
+                 CONTRIBUTION
+                 ============
 
->> Did you find that working on a particular part of the assignment gave
->> you greater insight into some aspect of OS design?
+Jaemin Kim (60%): Overall project planning & management. implementation
+of process_wait and push_argv, halt() and wait(). Provided skeleton code
+of syscall_init() function.
 
->> Is there some particular fact or hint we should give students in
->> future quarters to help them solve the problems?  Conversely, did you
->> find any of our guidance to be misleading?
+Munseong Son (40%): Implemented sanity check of syscall_init function
+and stack overflow check in push_argv. Implemented create, open, close function.
 
->> Do you have any suggestions for the TAs to more effectively assist
->> students, either for future quarters or the remaining projects?
-
->> Any other comments?
+-> 60:40 contribution.
