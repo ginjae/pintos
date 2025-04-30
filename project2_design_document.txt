@@ -121,11 +121,11 @@ Munseong Son <osoli6949@unist.ac.kr>
                  CONTRIBUTION
                  ============
 
-Jaemin Kim (60%): Overall project planning & management. implementation
+Jaemin Kim (50%): Overall project planning & management. implementation
 of process_wait and push_argv, halt() and wait(). Provided skeleton code
 of syscall_init() function.
 
-Munseong Son (40%): Implemented sanity check of syscall_init function
+Munseong Son (50%): Implemented sanity check of syscall_init function
 and stack overflow check in push_argv. Implemented create, open, close function.
 
--> 60:40 contribution.
+-> 50:50 contribution.
