@@ -41,23 +41,22 @@ Munseong Son <osoli6949@unist.ac.kr>
    strtok_r(). After slicing & counting argument number, we plug 
    the result and thread's stack pointer into push_argv function.
 
-   push_argv function put the arguments on the stack before execution, 
-   by using for loop and strlcpy(). This is done by moving stack 
-   pointer *esp and copying strings of argv[] into *esp.
+   push_argv function put the argument strings on the stack before
+   execution, by using for loop and strlcpy(). This is done by moving
+   stack pointer *esp down and copying strings of argv[] into *esp.
 
    After word-aligning the pointer by subtracting (*esp) % 4,
-   we push each arguments into stack including null pointer 
-   sentinel in argv[argc] and argv[0].
+   we push each arguments into stack from null pointer sentinel
+   of argv[argc] to argv[0].
 
-   Then we push argv and (pointer to) argc. Finally we push
-   fake "return address" to ensure the stack frame's structural
-   consistency.
+   Then we push the address of argv, and argc. Finally we push fake
+   "return address" to ensure the stack frame's structural consistency.
 
 -> Stack overflow is avoided by copying address value to the 
    variable sp_int, subtracting predicted amount of pointer
    "movement" and calling is_user_vaddr((void*)sp_int).
    This checks if stack pointer goes beyond the stack page
-   after performing push.
+   after performing pushes.
 
 
 ---- RATIONALE ----
