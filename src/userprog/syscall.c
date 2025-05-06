@@ -103,6 +103,8 @@ syscall_handler(struct intr_frame* f)
     // Waits for a child process pid and retrieves the child’s exit status.
     // Implementing this system call requires considerably more work than any of the rest.
 
+    // int process_wait(tid_t child_tid) // in process.c (Not implemented yet!)
+
     break;
 
   case SYS_CREATE:
@@ -156,6 +158,8 @@ syscall_handler(struct intr_frame* f)
     // actually read(0 at end of file), or -1 if the file could not be read(due to a condition
     // other than end of file).Fd 0 reads from the keyboard using input_getc().
 
+    // off_t file_read(struct file* file, void* buffer, off_t size) // in file.c
+
     break;
 
   case SYS_WRITE:
@@ -163,6 +167,8 @@ syscall_handler(struct intr_frame* f)
 
     // Writes size bytes from buffer to the open file fd. Returns the number of bytes actually
     // written, which may be less than size if some bytes could not be written.
+
+    // off_t file_write(struct file* file, const void* buffer, off_t size) // in file.c
 
     check_valid(f->esp + 4);
     check_valid(f->esp + 8);
@@ -179,6 +185,8 @@ syscall_handler(struct intr_frame* f)
     // Changes the next byte to be read or written in open file fd to position, expressed in
     // bytes from the beginning of the file.
 
+    // void file_seek(struct file* file, off_t new_pos) // in file.c
+
     break;
 
   case SYS_TELL:
@@ -186,6 +194,8 @@ syscall_handler(struct intr_frame* f)
 
     // Returns the position of the next byte to be read or written in open file fd, expressed
     // in bytes from the beginning of the file.
+
+    // off_t file_tell(struct file* file) // in file.c
 
     break;
 
