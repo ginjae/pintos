@@ -133,6 +133,8 @@ syscall_handler(struct intr_frame* f)
     // removed regardless of whether it is open or closed, and removing an open file does
     // not close it.
 
+    // bool filesys_remove(const char* name) // in filesys.c
+
     break;
 
   case SYS_OPEN:
@@ -150,6 +152,8 @@ syscall_handler(struct intr_frame* f)
     // int filesize (int fd)
 
     // Returns the size, in bytes, of the file open as fd.
+
+    // struct inode_disk has member: off_t length, which is file size in bytes
 
     break;
 
