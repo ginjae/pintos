@@ -95,6 +95,8 @@ syscall_handler(struct intr_frame* f)
     // Runs the executable whose name is given in cmd line, passing any given arguments,
     // and returns the new process’s program id(pid). Must return pid - 1,
 
+    // tid_t process_execute(const char* file_name) // in process.c
+
     break;
 
   case SYS_WAIT:
