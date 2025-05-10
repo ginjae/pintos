@@ -59,13 +59,6 @@ static void push_argv(int argc, char** argv, void** esp) {
   // Testing validity of stack pointer
   uintptr_t sp_int = (uint32_t)*esp;
 
-  // Check before movement
-  if (!is_user_vaddr((void*)sp_int)) {
-    printf("%s: exit(%d)\n", thread_name(), -1);
-    thread_exit();
-    return;
-  }
-
   for (i = argc - 1; i >= 0; i--) {
     int len = strlen(argv[i]) + 1;
     sp_int -= len;

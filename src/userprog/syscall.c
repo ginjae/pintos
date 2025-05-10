@@ -8,6 +8,7 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "devices/shutdown.h"
+#include "userprog/process.h"
 
 static void syscall_handler(struct intr_frame*);
 
@@ -97,6 +98,10 @@ syscall_handler(struct intr_frame* f)
 
     // tid_t process_execute(const char* file_name) // in process.c
 
+    check_valid(f->esp + 4); // Address check
+    tid_t pid;
+    pid = process_execute((const void*)*(uint32_t*)(f->esp + 4));
+    f->eax = pid; // return pid
     break;
 
   case SYS_WAIT:
