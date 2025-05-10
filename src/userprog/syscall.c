@@ -78,12 +78,31 @@ int write(int fd, void* buffer, unsigned size) {
       return -1;
     }
     struct file* f = fd_table[fd];
-    if (f == NULL) {
-      return -1; // error
-    }
     return file_write(f, buffer, size);
   }
   return -1;
+}
+
+void seek(int fd, unsigned position) {
+  struct file** fd_table = thread_current()->fd_table;
+  if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
+    printf("%s: exit(%d)\n", thread_name(), -1);
+    thread_exit();
+    return -1;
+  }
+  struct file* f = fd_table[fd];
+  file_seek(f, position);
+}
+
+unsigned tell(int fd) {
+  struct file** fd_table = thread_current()->fd_table;
+  if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
+    printf("%s: exit(%d)\n", thread_name(), -1);
+    thread_exit();
+    return -1;
+  }
+  struct file* f = fd_table[fd];
+  return file_tell(f);
 }
 
 void close(int fd) {
@@ -114,6 +133,8 @@ void check_valid(void* addr) {
 static void
 syscall_handler(struct intr_frame* f)
 {
+  // printf("case: %d\n", *(uint32_t*)f->esp);
+
   // Before handling system call:
   // Check if the stack pointer is valid (sc-bad-sp)
   check_valid(f->esp);
@@ -275,7 +296,6 @@ syscall_handler(struct intr_frame* f)
     f->eax = write((int)*(uint32_t*)(f->esp + 4),
       (void*)*(uint32_t*)(f->esp + 8),
       (unsigned)*((uint32_t*)(f->esp + 12)));
-
     break;
 
   case SYS_SEEK:
@@ -286,6 +306,11 @@ syscall_handler(struct intr_frame* f)
 
     // void file_seek(struct file* file, off_t new_pos) // in file.c
 
+    check_valid(f->esp + 4);
+    check_valid(f->esp + 8);
+
+    seek((int)*(uint32_t*)(f->esp + 4), (unsigned)*((uint32_t*)(f->esp + 8)));
+
     break;
 
   case SYS_TELL:
@@ -295,6 +320,11 @@ syscall_handler(struct intr_frame* f)
     // in bytes from the beginning of the file.
 
     // off_t file_tell(struct file* file) // in file.c
+
+    check_valid(f->esp + 4);
+    check_valid(f->esp + 8);
+
+    f->eax = tell((int)*(uint32_t*)(f->esp + 4));
 
     break;
 
