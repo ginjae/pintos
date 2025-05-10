@@ -217,6 +217,17 @@ syscall_handler(struct intr_frame* f)
 
     // bool filesys_remove(const char* name) // in filesys.c
 
+    check_valid(f->esp + 4);
+
+    if (!pagedir_get_page((uint32_t*)thread_current()->pagedir, (const void*)*(uint32_t*)(f->esp + 4))) {
+      printf("%s: exit(%d)\n", thread_name(), -1);
+      f->eax = -1; // return -1 (error)
+      thread_exit();
+      return;
+    }
+
+    f->eax = filesys_remove((const char*)*(uint32_t*)(f->esp + 4));
+
     break;
 
   case SYS_OPEN:
