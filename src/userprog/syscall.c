@@ -22,17 +22,66 @@ syscall_init(void)
 
 int open(const char* file) {
   struct file** fd_table = thread_current()->fd_table;
-  int i;
   struct file* f = filesys_open(file);
   if (f == NULL) {
     return -1; // error
   }
+
+  int i;
   for (i = 2; i < 130; i++) {
     if (fd_table[i] == NULL) {
       fd_table[i] = f;
-      // Note: table index = fd - 2
       return i;
     }
+  }
+  return -1;
+}
+
+int filesize(int fd) {
+  struct file** fd_table = thread_current()->fd_table;
+  if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
+    printf("%s: exit(%d)\n", thread_name(), -1);
+    thread_exit();
+    return -1;
+  }
+  struct file* f = fd_table[fd];
+  if (f == NULL) {
+    return -1; // error
+  }
+  return file_length(f);
+}
+
+int read(int fd, void* buffer, unsigned size) {
+  struct file** fd_table = thread_current()->fd_table;
+  if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
+    printf("%s: exit(%d)\n", thread_name(), -1);
+    thread_exit();
+    return -1;
+  }
+  struct file* f = fd_table[fd];
+  if (f == NULL) {
+    return -1; // error
+  }
+  return file_read(f, buffer, size);
+}
+
+int write(int fd, void* buffer, unsigned size) {
+  if (fd == 1) {
+    putbuf(buffer, size);
+    return size;
+  }
+  else {
+    struct file** fd_table = thread_current()->fd_table;
+    if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
+      printf("%s: exit(%d)\n", thread_name(), -1);
+      thread_exit();
+      return -1;
+    }
+    struct file* f = fd_table[fd];
+    if (f == NULL) {
+      return -1; // error
+    }
+    return file_write(f, buffer, size);
   }
   return -1;
 }
@@ -49,14 +98,6 @@ void close(int fd) {
     fd_table[fd] = NULL;
     return;
   }
-}
-
-int write(int fd, void* buffer, unsigned size) {
-  if (fd == 1) {
-    putbuf(buffer, size);
-    return size;
-  }
-  return -1;
 }
 
 /* A function which checks if a virtual address is valid.
@@ -98,7 +139,15 @@ syscall_handler(struct intr_frame* f)
 
     // tid_t process_execute(const char* file_name) // in process.c
 
-    check_valid(f->esp + 4); // Address check
+    check_valid(f->esp + 4);
+
+    if (!pagedir_get_page((uint32_t*)thread_current()->pagedir, (const void*)*(uint32_t*)(f->esp + 4))) {
+      printf("%s: exit(%d)\n", thread_name(), -1);
+      f->eax = -1; // return 0 (false)
+      thread_exit();
+      return;
+    }
+
     tid_t pid;
     pid = process_execute((const void*)*(uint32_t*)(f->esp + 4));
     f->eax = pid; // return pid
@@ -115,14 +164,21 @@ syscall_handler(struct intr_frame* f)
     break;
 
   case SYS_CREATE:
+    // bool create (const char *file, unsigned initial_size)
+
+    // Creates a new file called file initially initial size bytes in size. Returns true if successful,
+    // false otherwise.
+
+    check_valid(f->esp + 4);
+    check_valid(f->esp + 8);
+
     if (!pagedir_get_page((uint32_t*)thread_current()->pagedir, (const void*)*(uint32_t*)(f->esp + 4))) {
       printf("%s: exit(%d)\n", thread_name(), -1);
       f->eax = 0; // return 0 (false)
       thread_exit();
       return;
     }
-    check_valid(f->esp + 4);
-    check_valid(f->esp + 8);
+
     if (filesys_create((const char*)*(uint32_t*)(f->esp + 4), (unsigned)*((uint32_t*)(f->esp + 8)))) {
       f->eax = 1; // return 1 (true)
     }
@@ -143,13 +199,20 @@ syscall_handler(struct intr_frame* f)
     break;
 
   case SYS_OPEN:
+    // int open (const char *file)
+
+    // Opens the file called file. Returns a nonnegative integer handle called a “file descriptor”
+    // (fd), or -1 if the file could not be opened.
+
     if (!pagedir_get_page((uint32_t*)thread_current()->pagedir, (const void*)*(uint32_t*)(f->esp + 4))) {
       printf("%s: exit(%d)\n", thread_name(), -1);
       f->eax = -1; // return -1 (error)
       thread_exit();
       return;
     }
+
     check_valid(f->esp + 4);
+
     f->eax = open((const char*)*(uint32_t*)(f->esp + 4));
     break;
 
@@ -159,6 +222,8 @@ syscall_handler(struct intr_frame* f)
     // Returns the size, in bytes, of the file open as fd.
 
     // struct inode_disk has member: off_t length, which is file size in bytes
+    check_valid(f->esp + 4);
+    f->eax = filesize((int)*(uint32_t*)(f->esp + 4));
 
     break;
 
@@ -170,6 +235,21 @@ syscall_handler(struct intr_frame* f)
     // other than end of file).Fd 0 reads from the keyboard using input_getc().
 
     // off_t file_read(struct file* file, void* buffer, off_t size) // in file.c
+
+    check_valid(f->esp + 4);
+    check_valid(f->esp + 8);
+    check_valid(f->esp + 12);
+
+    if (!is_user_vaddr((void*)*(uint32_t*)(f->esp + 8)) || !pagedir_get_page((uint32_t*)thread_current()->pagedir, (const void*)*(uint32_t*)(f->esp + 8))) {
+      printf("%s: exit(%d)\n", thread_name(), -1);
+      f->eax = -1; // return -1 (false)
+      thread_exit();
+      return;
+    }
+
+    f->eax = read((int)*(uint32_t*)(f->esp + 4),
+      (void*)*(uint32_t*)(f->esp + 8),
+      (unsigned)*((uint32_t*)(f->esp + 12)));
 
     break;
 
@@ -184,6 +264,14 @@ syscall_handler(struct intr_frame* f)
     check_valid(f->esp + 4);
     check_valid(f->esp + 8);
     check_valid(f->esp + 12);
+
+    if (!is_user_vaddr((void*)*(uint32_t*)(f->esp + 8)) || !pagedir_get_page((uint32_t*)thread_current()->pagedir, (const void*)*(uint32_t*)(f->esp + 8))) {
+      printf("%s: exit(%d)\n", thread_name(), -1);
+      f->eax = -1; // return -1 (false)
+      thread_exit();
+      return;
+    }
+
     f->eax = write((int)*(uint32_t*)(f->esp + 4),
       (void*)*(uint32_t*)(f->esp + 8),
       (unsigned)*((uint32_t*)(f->esp + 12)));
