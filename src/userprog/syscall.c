@@ -20,6 +20,12 @@ syscall_init(void)
   intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
+void exit(int status) {
+  printf("%s: exit(%d)\n", thread_name(), status);
+  thread_current()->exit_status = status;
+  thread_exit();
+}
+
 int open(const char* file) {
   struct file** fd_table = thread_current()->fd_table;
   struct file* f = filesys_open(file);
@@ -40,8 +46,7 @@ int open(const char* file) {
 int filesize(int fd) {
   struct file** fd_table = thread_current()->fd_table;
   if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
-    printf("%s: exit(%d)\n", thread_name(), -1);
-    thread_exit();
+    exit(-1);
     return -1;
   }
   struct file* f = fd_table[fd];
@@ -54,8 +59,7 @@ int filesize(int fd) {
 int read(int fd, void* buffer, unsigned size) {
   struct file** fd_table = thread_current()->fd_table;
   if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
-    printf("%s: exit(%d)\n", thread_name(), -1);
-    thread_exit();
+    exit(-1);
     return -1;
   }
   struct file* f = fd_table[fd];
@@ -73,8 +77,7 @@ int write(int fd, void* buffer, unsigned size) {
   else {
     struct file** fd_table = thread_current()->fd_table;
     if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
-      printf("%s: exit(%d)\n", thread_name(), -1);
-      thread_exit();
+      exit(-1);
       return -1;
     }
     struct file* f = fd_table[fd];
@@ -86,8 +89,7 @@ int write(int fd, void* buffer, unsigned size) {
 void seek(int fd, unsigned position) {
   struct file** fd_table = thread_current()->fd_table;
   if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
-    printf("%s: exit(%d)\n", thread_name(), -1);
-    thread_exit();
+    exit(-1);
     return -1;
   }
   struct file* f = fd_table[fd];
@@ -97,8 +99,7 @@ void seek(int fd, unsigned position) {
 unsigned tell(int fd) {
   struct file** fd_table = thread_current()->fd_table;
   if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
-    printf("%s: exit(%d)\n", thread_name(), -1);
-    thread_exit();
+    exit(-1);
     return -1;
   }
   struct file* f = fd_table[fd];
@@ -108,8 +109,7 @@ unsigned tell(int fd) {
 void close(int fd) {
   struct file** fd_table = thread_current()->fd_table;
   if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
-    printf("%s: exit(%d)\n", thread_name(), -1);
-    thread_exit();
+    exit(-1);
     return;
   }
   else {
@@ -124,8 +124,7 @@ void close(int fd) {
 void check_valid(void* addr) {
   uint32_t* current_pd = thread_current()->pagedir;
   if (!addr || !is_user_vaddr(addr) || !pagedir_get_page(current_pd, addr)) {
-    printf("%s: exit(%d)\n", thread_name(), -1);
-    thread_exit();
+    exit(-1);
     return;
   }
 }
@@ -148,8 +147,7 @@ syscall_handler(struct intr_frame* f)
 
   case SYS_EXIT:
     check_valid(f->esp + 4);
-    printf("%s: exit(%d)\n", thread_name(), *(uint32_t*)(f->esp + 4));
-    thread_exit();
+    exit(*(uint32_t*)(f->esp + 4));
     break;
 
   case SYS_EXEC:
@@ -163,9 +161,8 @@ syscall_handler(struct intr_frame* f)
     check_valid(f->esp + 4);
 
     if (!pagedir_get_page((uint32_t*)thread_current()->pagedir, (const void*)*(uint32_t*)(f->esp + 4))) {
-      printf("%s: exit(%d)\n", thread_name(), -1);
-      f->eax = -1; // return 0 (false)
-      thread_exit();
+      f->eax = -1;
+      exit(-1);
       return;
     }
 
@@ -181,6 +178,9 @@ syscall_handler(struct intr_frame* f)
     // Implementing this system call requires considerably more work than any of the rest.
 
     // int process_wait(tid_t child_tid) // in process.c (Not implemented yet!)
+    
+    check_valid(f->esp + 4);
+    process_wait((tid_t*)*(uint32_t*)(f->esp + 4));
 
     break;
 
@@ -194,9 +194,8 @@ syscall_handler(struct intr_frame* f)
     check_valid(f->esp + 8);
 
     if (!pagedir_get_page((uint32_t*)thread_current()->pagedir, (const void*)*(uint32_t*)(f->esp + 4))) {
-      printf("%s: exit(%d)\n", thread_name(), -1);
-      f->eax = 0; // return 0 (false)
-      thread_exit();
+      f->eax = -1; // return 0 (false)
+      exit(-1);
       return;
     }
 
@@ -220,9 +219,8 @@ syscall_handler(struct intr_frame* f)
     check_valid(f->esp + 4);
 
     if (!pagedir_get_page((uint32_t*)thread_current()->pagedir, (const void*)*(uint32_t*)(f->esp + 4))) {
-      printf("%s: exit(%d)\n", thread_name(), -1);
       f->eax = -1; // return -1 (error)
-      thread_exit();
+      exit(-1);
       return;
     }
 
@@ -237,9 +235,8 @@ syscall_handler(struct intr_frame* f)
     // (fd), or -1 if the file could not be opened.
 
     if (!pagedir_get_page((uint32_t*)thread_current()->pagedir, (const void*)*(uint32_t*)(f->esp + 4))) {
-      printf("%s: exit(%d)\n", thread_name(), -1);
       f->eax = -1; // return -1 (error)
-      thread_exit();
+      exit(-1);
       return;
     }
 
@@ -273,9 +270,8 @@ syscall_handler(struct intr_frame* f)
     check_valid(f->esp + 12);
 
     if (!is_user_vaddr((void*)*(uint32_t*)(f->esp + 8)) || !pagedir_get_page((uint32_t*)thread_current()->pagedir, (const void*)*(uint32_t*)(f->esp + 8))) {
-      printf("%s: exit(%d)\n", thread_name(), -1);
       f->eax = -1; // return -1 (false)
-      thread_exit();
+      exit(-1);
       return;
     }
 
@@ -298,9 +294,8 @@ syscall_handler(struct intr_frame* f)
     check_valid(f->esp + 12);
 
     if (!is_user_vaddr((void*)*(uint32_t*)(f->esp + 8)) || !pagedir_get_page((uint32_t*)thread_current()->pagedir, (const void*)*(uint32_t*)(f->esp + 8))) {
-      printf("%s: exit(%d)\n", thread_name(), -1);
       f->eax = -1; // return -1 (false)
-      thread_exit();
+      exit(-1);
       return;
     }
 

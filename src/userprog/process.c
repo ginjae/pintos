@@ -179,12 +179,18 @@ static void start_process(void* file_name_) {
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int process_wait(tid_t child_tid UNUSED) {
-  // To prevent Pintos from terminating
-  // before user processes run and exit properly.
-  // This will be modified in project 2-1.
-  timer_msleep(3000);
-  // volatile int i;
-  // for (i = 0; i < 1000000; i++);
+  struct list_elem* e;
+
+  for (e = list_begin(&(thread_current()->children)); e != list_end(&(thread_current()->children)); e = list_next(e)) {
+    struct thread* t = list_entry(e, struct thread, childelem);
+    if (t->tid == child_tid) {
+      sema_down(&(t->child_sema));
+      int exit_status = t->exit_status;
+      /* FIXME : list_remove를 하면 page fault... */
+      // list_remove(&(t->childelem));
+      return exit_status;
+    }
+  }
 
   return -1;
 }
@@ -209,6 +215,7 @@ void process_exit(void) {
     pagedir_activate(NULL);
     pagedir_destroy(pd);
   }
+  sema_up(&(cur->child_sema));
 }
 
 /* Sets up the CPU for running user code in the current

@@ -561,9 +561,17 @@ init_thread(struct thread* t, const char* name, int priority)
   t->magic = THREAD_MAGIC;
   list_push_back(&all_list, &t->allelem);
 
+#ifdef USERPROG
   int i;
   for (i = 0; i < FD_TABLE_SIZE; i++)
     t->fd_table[i] = NULL;
+
+  t->parent = running_thread();
+  list_init(&(t->children));
+  list_push_back(&(t->parent->children), &(t->childelem));
+
+  sema_init(&(t->child_sema), 0);
+#endif
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

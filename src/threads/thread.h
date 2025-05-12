@@ -5,6 +5,8 @@
 #include <list.h>
 #include <stdint.h>
 
+#include "threads/synch.h"
+
 /* States in a thread's life cycle. */
 enum thread_status
 {
@@ -95,7 +97,6 @@ struct thread
    int priority;                       /* Priority. */
    struct list_elem allelem;           /* List element for all threads list. */
    int64_t wake_me_at;                 /* Tick to wake up the thread. */
-   struct file* fd_table[FD_TABLE_SIZE];         /* per-thread file descriptor table */
 
    /* Shared between thread.c and synch.c. */
    struct list_elem elem;              /* List element. */
@@ -103,6 +104,16 @@ struct thread
 #ifdef USERPROG
    /* Owned by userprog/process.c. */
    uint32_t* pagedir;                  /* Page directory. */
+
+   struct file* fd_table[FD_TABLE_SIZE];    /* Per-process file descriptor table */
+
+   struct thread* parent;                   /* Parent process */
+   struct list children;                    /* List of child processes */
+   struct list_elem childelem;              /* List element for child processes list */
+
+   struct semaphore child_sema;
+
+   int exit_status;                         /* Return value of calling exit */
 #endif
 
    /* Owned by thread.c. */
