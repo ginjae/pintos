@@ -12,8 +12,6 @@
 
 static void syscall_handler(struct intr_frame*);
 
-// static struct file* fd_table[128]; // FIXME: 128 is arbitrary.
-
 void
 syscall_init(void)
 {
@@ -57,6 +55,14 @@ int filesize(int fd) {
 }
 
 int read(int fd, void* buffer, unsigned size) {
+  if (fd == 0) {
+    int i;
+    int* buffer_c = buffer;
+    for (i = 0; i < size; i++)
+      buffer_c[i] = input_getc();
+    return size;
+  }
+
   struct file** fd_table = thread_current()->fd_table;
   if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
     exit(-1);
