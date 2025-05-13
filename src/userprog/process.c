@@ -200,6 +200,8 @@ int process_wait(tid_t child_tid UNUSED) {
 void process_exit(void) {
   struct thread* cur = thread_current();
   uint32_t* pd;
+
+  // release lock & remove childelem before destroying pd
   sema_up(&(cur->child_sema));
   list_remove(&thread_current()->childelem);
 

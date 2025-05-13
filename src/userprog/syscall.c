@@ -147,7 +147,7 @@ static void syscall_handler(struct intr_frame* f) {
 
     case SYS_EXIT:
       check_valid(f->esp + 4);
-      f->eax = *(uint32_t*)(f->esp + 4);
+      f->eax = *(uint32_t*)(f->esp + 4);  // update return value
       exit(*(uint32_t*)(f->esp + 4));
       break;
 
@@ -171,7 +171,8 @@ static void syscall_handler(struct intr_frame* f) {
 
       tid_t pid;
       pid = process_execute((const void*)*(uint32_t*)(f->esp + 4));
-      f->eax = pid;  // return pid - 1
+      f->eax = pid;  // FIXME...? : It should return pid - 1
+                     // but for some reason, it works.
       break;
 
     case SYS_WAIT:
