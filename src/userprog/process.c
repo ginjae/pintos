@@ -44,7 +44,7 @@ tid_t process_execute(const char* file_name) {
   strlcpy(command, file_name, strlen(file_name) + 1);
   char* save_ptr;
   strtok_r(command, " ", &save_ptr);
-  
+
   // If no such executable is found, return -1
   struct file* file = filesys_open(command);
   if (!file) {
@@ -55,7 +55,8 @@ tid_t process_execute(const char* file_name) {
   file_close(file);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create(command, PRI_DEFAULT, start_process, fn_copy);
+  int current_pri = thread_get_priority();
+  tid = thread_create(command, current_pri + 1, start_process, fn_copy);
   if (tid == TID_ERROR) palloc_free_page(fn_copy);
   free(command);
   return tid;
@@ -195,9 +196,9 @@ int process_wait(tid_t child_tid) {
        e != list_end(&(thread_current()->children)); e = list_next(e)) {
     struct thread* t = list_entry(e, struct thread, childelem);
     if (t->tid == child_tid) {
-      sema_down(&(t->child_sema));        // Wait until child process exiting
-      int exit_status = t->exit_status;   // Save exit status
-      sema_up(&(t->exit_sema));           // Now, we can remove childelem
+      sema_down(&(t->child_sema));       // Wait until child process exiting
+      int exit_status = t->exit_status;  // Save exit status
+      sema_up(&(t->exit_sema));          // Now, we can remove childelem
       return exit_status;
     }
   }
