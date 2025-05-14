@@ -222,6 +222,9 @@ tid_t thread_create(const char* name, int priority, thread_func* function,
      current thread should yield CPU. */
   thread_check_priority();
 
+  /* Update tid in case of load() error. */
+  tid = t->tid;
+  // printf("thread_create is returning: %d\n", tid);
   return tid;
 }
 

@@ -91,7 +91,7 @@ int write(int fd, void* buffer, unsigned size) {
     return -1;
   }
   check_valid(buffer);
-  
+
   lock_acquire(&filesys_lock);
   if (fd == 1) {
     putbuf(buffer, size);
@@ -221,7 +221,8 @@ static void syscall_handler(struct intr_frame* f) {
       check_valid(f->esp + 4);
       check_valid(f->esp + 8);
 
-      if (!pagedir_get_page((uint32_t*)thread_current()->pagedir,
+      if (!is_user_vaddr((void*)*(uint32_t*)(f->esp + 4)) ||
+          !pagedir_get_page((uint32_t*)thread_current()->pagedir,
                             (const void*)*(uint32_t*)(f->esp + 4))) {
         f->eax = -1;  // return 0 (false)
         exit(-1);
@@ -247,7 +248,8 @@ static void syscall_handler(struct intr_frame* f) {
 
       check_valid(f->esp + 4);
 
-      if (!pagedir_get_page((uint32_t*)thread_current()->pagedir,
+      if (!is_user_vaddr((void*)*(uint32_t*)(f->esp + 4)) ||
+          !pagedir_get_page((uint32_t*)thread_current()->pagedir,
                             (const void*)*(uint32_t*)(f->esp + 4))) {
         f->eax = -1;  // return -1 (error)
         exit(-1);
@@ -264,14 +266,15 @@ static void syscall_handler(struct intr_frame* f) {
       // Opens the file called file. Returns a nonnegative integer handle called
       // a “file descriptor” (fd), or -1 if the file could not be opened.
 
-      if (!pagedir_get_page((uint32_t*)thread_current()->pagedir,
+      check_valid(f->esp + 4);
+
+      if (!is_user_vaddr((void*)*(uint32_t*)(f->esp + 4)) ||
+          !pagedir_get_page((uint32_t*)thread_current()->pagedir,
                             (const void*)*(uint32_t*)(f->esp + 4))) {
         f->eax = -1;  // return -1 (error)
         exit(-1);
         return;
       }
-
-      check_valid(f->esp + 4);
 
       f->eax = open((const char*)*(uint32_t*)(f->esp + 4));
       break;

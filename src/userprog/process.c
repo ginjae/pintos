@@ -46,6 +46,7 @@ tid_t process_execute(const char* file_name) {
   strtok_r(command, " ", &save_ptr);
 
   // If no such executable is found, return -1
+  /*
   struct file* file = filesys_open(command);
   if (!file) {
     palloc_free_page(fn_copy);
@@ -53,11 +54,15 @@ tid_t process_execute(const char* file_name) {
     return -1;
   }
   file_close(file);
+  */
 
   /* Create a new thread to execute FILE_NAME. */
   int current_pri = thread_get_priority();
   tid = thread_create(command, current_pri + 1, start_process, fn_copy);
-  if (tid == TID_ERROR) palloc_free_page(fn_copy);
+  if (tid == TID_ERROR)
+    palloc_free_page(fn_copy);
+  else if (tid == -2)  // load failure
+    tid = -1;
   free(command);
   return tid;
 }
@@ -189,6 +194,7 @@ static void start_process(void* file_name_) {
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int process_wait(tid_t child_tid) {
+  int exit_status = -1;
   struct list_elem* e;
 
   // Search the target child process
@@ -196,15 +202,15 @@ int process_wait(tid_t child_tid) {
        e != list_end(&(thread_current()->children)); e = list_next(e)) {
     struct thread* t = list_entry(e, struct thread, childelem);
     if (t->tid == child_tid) {
-      sema_down(&(t->child_sema));       // Wait until child process exiting
-      int exit_status = t->exit_status;  // Save exit status
-      sema_up(&(t->exit_sema));          // Now, we can remove childelem
+      sema_down(&(t->child_sema));   // Wait until child process exiting
+      exit_status = t->exit_status;  // Save exit status
+      sema_up(&(t->exit_sema));      // Now, we can remove childelem
       return exit_status;
     }
   }
 
   // If child_tid is not a child
-  return -1;
+  return exit_status;
 }
 
 /* Free the current process's resources. */
@@ -415,8 +421,15 @@ done:
      prevent from writing the file.
      Later in process_exit, close the file. */
   // file_close(file);
-  t->executable = file;
-  file_deny_write(file);
+
+  if (!success) {
+    // printf("Load failed! Current pid is: %d, which should be -1\n",
+    // thread_current()->tid);
+    thread_current()->tid = -2;  // specify load failure
+  } else {
+    t->executable = file;
+    file_deny_write(file);
+  }
   return success;
 }
 
