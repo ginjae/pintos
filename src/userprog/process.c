@@ -216,6 +216,8 @@ void process_exit(void) {
   sema_down(&(cur->list_sema));
   list_remove(&(cur->childelem));
 
+  file_close(cur->executable);
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -407,7 +409,13 @@ bool load(const char* file_name, void (**eip)(void), void** esp) {
 
 done:
   /* We arrive here whether the load is successful or not. */
-  file_close(file);
+
+  /* Instead of closing the file, save the file pointer and
+     prevent from writing the file.
+     Later in process_exit, close the file. */
+  // file_close(file);
+  t->executable = file;
+  file_deny_write(file);
   return success;
 }
 

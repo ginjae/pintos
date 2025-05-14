@@ -115,6 +115,7 @@ struct thread
    struct semaphore list_sema;              /* Semaphore for right order of list_remove */
 
    int exit_status;                         /* Return value of calling exit */
+   struct file* executable;                 /* Current running file */
 #endif
 
    /* Owned by thread.c. */
