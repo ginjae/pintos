@@ -197,7 +197,7 @@ int process_wait(tid_t child_tid) {
     if (t->tid == child_tid) {
       sema_down(&(t->child_sema));        // Wait until child process exiting
       int exit_status = t->exit_status;   // Save exit status
-      sema_up(&(t->list_sema));           // Now, we can remove childelem
+      sema_up(&(t->exit_sema));           // Now, we can remove childelem
       return exit_status;
     }
   }
@@ -213,7 +213,7 @@ void process_exit(void) {
 
   // release lock & remove childelem before destroying pd
   sema_up(&(cur->child_sema));
-  sema_down(&(cur->list_sema));
+  sema_down(&(cur->exit_sema));
   list_remove(&(cur->childelem));
 
   file_close(cur->executable);

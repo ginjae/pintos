@@ -7,6 +7,7 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
@@ -16,6 +17,7 @@ static void syscall_handler(struct intr_frame*);
 
 void syscall_init(void) {
   intr_register_int(0x30, 3, INTR_ON, syscall_handler, "syscall");
+  lock_init(&filesys_lock);
 }
 
 void exit(int status) {
@@ -26,7 +28,9 @@ void exit(int status) {
 
 int open(const char* file) {
   struct file** fd_table = thread_current()->fd_table;
+  lock_acquire(&filesys_lock);
   struct file* f = filesys_open(file);
+  lock_release(&filesys_lock);
   if (f == NULL) {
     return -1;  // error
   }
@@ -55,38 +59,56 @@ int filesize(int fd) {
 }
 
 int read(int fd, void* buffer, unsigned size) {
+  if (fd < 0 || fd == 1 || fd > 129) {
+    exit(-1);
+    return -1;
+  }
+  check_valid(buffer);
+
+  lock_acquire(&filesys_lock);
   if (fd == 0) {
     int i;
     int* buffer_c = buffer;
     for (i = 0; i < size; i++) buffer_c[i] = input_getc();
+    lock_release(&filesys_lock);
     return size;
   }
 
   struct file** fd_table = thread_current()->fd_table;
-  if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
-    exit(-1);
-    return -1;
-  }
   struct file* f = fd_table[fd];
   if (f == NULL) {
+    lock_release(&filesys_lock);
     return -1;  // error
   }
-  return file_read(f, buffer, size);
+  int ret = file_read(f, buffer, size);
+  lock_release(&filesys_lock);
+  return ret;
 }
 
 int write(int fd, void* buffer, unsigned size) {
+  if (fd < 1 || fd > 129) {
+    exit(-1);
+    return -1;
+  }
+  check_valid(buffer);
+  
+  lock_acquire(&filesys_lock);
   if (fd == 1) {
     putbuf(buffer, size);
+    lock_release(&filesys_lock);
     return size;
   } else {
     struct file** fd_table = thread_current()->fd_table;
-    if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
-      exit(-1);
-      return -1;
-    }
     struct file* f = fd_table[fd];
-    return file_write(f, buffer, size);
+    if (f == NULL) {
+      lock_release(&filesys_lock);
+      return -1;  // error
+    }
+    int ret = file_write(f, buffer, size);
+    lock_release(&filesys_lock);
+    return ret;
   }
+  lock_release(&filesys_lock);
   return -1;
 }
 

@@ -112,7 +112,7 @@ struct thread
    struct list_elem childelem;              /* List element for child processes list */
 
    struct semaphore child_sema;             /* Semaphore for waiting child */
-   struct semaphore list_sema;              /* Semaphore for right order of list_remove */
+   struct semaphore exit_sema;              /* Semaphore for right order of exiting */
 
    int exit_status;                         /* Return value of calling exit */
    struct file* executable;                 /* Current running file */

@@ -497,7 +497,7 @@ static void init_thread(struct thread* t, const char* name, int priority) {
   list_push_back(&(t->parent->children), &(t->childelem));
 
   sema_init(&(t->child_sema), 0);
-  sema_init(&(t->list_sema), 0);
+  sema_init(&(t->exit_sema), 0);
 #endif
 }
 
