@@ -44,6 +44,15 @@ tid_t process_execute(const char* file_name) {
   strlcpy(command, file_name, strlen(file_name) + 1);
   char* save_ptr;
   strtok_r(command, " ", &save_ptr);
+  
+  // If no such executable is found, return -1
+  struct file* file = filesys_open(command);
+  if (!file) {
+    palloc_free_page(fn_copy);
+    free(command);
+    return -1;
+  }
+  file_close(file);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create(command, PRI_DEFAULT, start_process, fn_copy);
@@ -178,21 +187,22 @@ static void start_process(void* file_name_) {
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
-int process_wait(tid_t child_tid UNUSED) {
+int process_wait(tid_t child_tid) {
   struct list_elem* e;
 
+  // Search the target child process
   for (e = list_begin(&(thread_current()->children));
        e != list_end(&(thread_current()->children)); e = list_next(e)) {
     struct thread* t = list_entry(e, struct thread, childelem);
     if (t->tid == child_tid) {
-      sema_down(&(t->child_sema));
-      int exit_status = t->exit_status;
-      /* FIXME : list_remove를 하면 page fault... */
-      // list_remove(&(t->childelem));
+      sema_down(&(t->child_sema));        // Wait until child process exiting
+      int exit_status = t->exit_status;   // Save exit status
+      sema_up(&(t->list_sema));           // Now, we can remove childelem
       return exit_status;
     }
   }
 
+  // If child_tid is not a child
   return -1;
 }
 
@@ -203,7 +213,8 @@ void process_exit(void) {
 
   // release lock & remove childelem before destroying pd
   sema_up(&(cur->child_sema));
-  list_remove(&thread_current()->childelem);
+  sema_down(&(cur->list_sema));
+  list_remove(&(cur->childelem));
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
