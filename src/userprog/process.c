@@ -58,6 +58,7 @@ tid_t process_execute(const char* file_name) {
 
   /* Create a new thread to execute FILE_NAME. */
   int current_pri = thread_get_priority();
+  if (current_pri == PRI_MAX - 1) return -1;
   tid = thread_create(command, current_pri + 1, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page(fn_copy);
