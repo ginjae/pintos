@@ -331,14 +331,6 @@ void thread_exit(void) {
 
 #ifdef USERPROG
   process_exit();
-  struct file** fd_table = thread_current()->fd_table;
-  int i;
-  for (i = 2; i < 130; i++) {
-    if (fd_table[i] != NULL) {
-      struct file* f = fd_table[i];
-      file_close(f);
-    }
-  }
 #endif
 
   /* Remove thread from all threads list, set our status to dying,
