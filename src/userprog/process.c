@@ -41,6 +41,10 @@ tid_t process_execute(const char* file_name) {
 
   // To pass only command name instead of the whole line with arguments
   char* command = malloc(sizeof(char) * (strlen(file_name) + 1));
+  if (command == NULL) {
+    palloc_free_page(fn_copy);
+    return -1;
+  }
   strlcpy(command, file_name, strlen(file_name) + 1);
   char* save_ptr;
   strtok_r(command, " ", &save_ptr);
@@ -57,13 +61,17 @@ tid_t process_execute(const char* file_name) {
   */
 
   /* Create a new thread to execute FILE_NAME. */
-  int current_pri = thread_get_priority();
-  if (current_pri == PRI_MAX - 1) return -1;
-  tid = thread_create(command, current_pri + 1, start_process, fn_copy);
+  // int current_pri = thread_get_priority();
+  // if (current_pri == PRI_MAX - 1) return -1;
+  // tid = thread_create(command, current_pri + 1, start_process, fn_copy);
+  tid = thread_create(command, PRI_DEFAULT, start_process, fn_copy);
+
   if (tid == TID_ERROR)
     palloc_free_page(fn_copy);
-  else if (tid == -2)  // load failure
-    tid = -1;
+  // else if (tid == -2) {   // load failure
+  //   tid = -1;
+  //   palloc_free_page(fn_copy);
+  // }
   free(command);
   return tid;
 }
@@ -141,6 +149,10 @@ static void push_argv(int argc, char** argv, void** esp) {
 static void start_process(void* file_name_) {
   // char *file_name = file_name_;
   char* file_name = malloc(sizeof(char) * (strlen(file_name_) + 1));
+  if (file_name == NULL) {
+    palloc_free_page(file_name_);
+    thread_exit();
+  }
   strlcpy(file_name, file_name_, strlen(file_name_) + 1);
   struct intr_frame if_;
   bool success;
@@ -152,6 +164,11 @@ static void start_process(void* file_name_) {
        token = strtok_r(NULL, " ", &save_ptr))
     argc++;
   char** argv = malloc(sizeof(char*) * argc);
+  if (argv == NULL) {
+    palloc_free_page(file_name_);
+    free(file_name);
+    thread_exit();
+  }
 
   // Get the values of argv array
   strlcpy(file_name, file_name_, strlen(file_name_) + 1);
@@ -166,6 +183,7 @@ static void start_process(void* file_name_) {
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load(argv[0], &if_.eip, &if_.esp);
+  sema_up(&(thread_current()->load_sema));
 
   if (success) push_argv(argc, argv, &if_.esp);
 
@@ -224,7 +242,28 @@ void process_exit(void) {
   sema_down(&(cur->exit_sema));
   list_remove(&(cur->childelem));
 
-  file_close(cur->executable);
+  // Close files that process opened
+  int i;
+  for (i = 2; i < FD_TABLE_SIZE; i++) {
+    if (cur->fd_table[i] != NULL) {
+      file_close(cur->fd_table[i]);
+      cur->fd_table[i] = NULL;
+    }
+  }
+
+  // Close its executable file
+  if (cur->executable != NULL) {
+    file_close(cur->executable);
+    cur->executable = NULL;
+  }
+
+  // Call wait for all children
+  struct list_elem* e;
+  for (e = list_begin(&(thread_current()->children));
+      e != list_end(&(thread_current()->children)); e = list_next(e)) {
+    struct thread* t = list_entry(e, struct thread, childelem);
+    process_wait(t->tid);
+  }
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -345,6 +384,7 @@ bool load(const char* file_name, void (**eip)(void), void** esp) {
   file = filesys_open(file_name);
   if (file == NULL) {
     printf("load: %s: open failed\n", file_name);
+    file_close(file);
     goto done;
   }
 
@@ -426,7 +466,8 @@ done:
   if (!success) {
     // printf("Load failed! Current pid is: %d, which should be -1\n",
     // thread_current()->tid);
-    thread_current()->tid = -2;  // specify load failure
+    // thread_current()->tid = -2;  // specify load failure
+    thread_current()->load_status = false;
   } else {
     t->executable = file;
     file_deny_write(file);

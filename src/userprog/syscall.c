@@ -47,7 +47,7 @@ int open(const char* file) {
 
 int filesize(int fd) {
   struct file** fd_table = thread_current()->fd_table;
-  if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
+  if (fd < 2 || fd >= FD_TABLE_SIZE || fd_table[fd] == NULL) {
     exit(-1);
     return -1;
   }
@@ -59,7 +59,7 @@ int filesize(int fd) {
 }
 
 int read(int fd, void* buffer, unsigned size) {
-  if (fd < 0 || fd == 1 || fd > 129) {
+  if (fd < 0 || fd == 1 || fd >= FD_TABLE_SIZE) {
     exit(-1);
     return -1;
   }
@@ -86,7 +86,7 @@ int read(int fd, void* buffer, unsigned size) {
 }
 
 int write(int fd, void* buffer, unsigned size) {
-  if (fd < 1 || fd > 129) {
+  if (fd < 1 || fd >= FD_TABLE_SIZE) {
     exit(-1);
     return -1;
   }
@@ -114,7 +114,7 @@ int write(int fd, void* buffer, unsigned size) {
 
 void seek(int fd, unsigned position) {
   struct file** fd_table = thread_current()->fd_table;
-  if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
+  if (fd < 2 || fd >= FD_TABLE_SIZE || fd_table[fd] == NULL) {
     exit(-1);
     return -1;
   }
@@ -124,7 +124,7 @@ void seek(int fd, unsigned position) {
 
 unsigned tell(int fd) {
   struct file** fd_table = thread_current()->fd_table;
-  if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
+  if (fd < 2 || fd >= FD_TABLE_SIZE || fd_table[fd] == NULL) {
     exit(-1);
     return -1;
   }
@@ -134,7 +134,7 @@ unsigned tell(int fd) {
 
 void close(int fd) {
   struct file** fd_table = thread_current()->fd_table;
-  if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
+  if (fd < 2 || fd >= FD_TABLE_SIZE || fd_table[fd] == NULL) {
     exit(-1);
     return;
   } else {
@@ -193,8 +193,21 @@ static void syscall_handler(struct intr_frame* f) {
 
       tid_t pid;
       pid = process_execute((const void*)*(uint32_t*)(f->esp + 4));
-      f->eax = pid;  // FIXME...? : It should return pid - 1
-                     // but for some reason, it works.
+
+      // Search point to thread created, then wait for its loading
+      // If the loading failed, return value should become -1
+      struct list_elem* e;
+      for (e = list_begin(&(thread_current()->children));
+          e != list_end(&(thread_current()->children)); e = list_next(e)) {
+        struct thread* t = list_entry(e, struct thread, childelem);
+        if (t->tid == pid) {
+          sema_down(&(t->load_sema));
+          if (!t->load_status)
+            pid = -1;
+          break;
+        }
+      }
+      f->eax = pid;
       break;
 
     case SYS_WAIT:
