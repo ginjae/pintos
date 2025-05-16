@@ -47,7 +47,7 @@ int open(const char* file) {
 
 int filesize(int fd) {
   struct file** fd_table = thread_current()->fd_table;
-  if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
+  if (fd < 2 || fd >= FD_TABLE_SIZE || fd_table[fd] == NULL) {
     exit(-1);
     return -1;
   }
@@ -59,7 +59,7 @@ int filesize(int fd) {
 }
 
 int read(int fd, void* buffer, unsigned size) {
-  if (fd < 0 || fd == 1 || fd > 129) {
+  if (fd < 0 || fd == 1 || fd >= FD_TABLE_SIZE) {
     exit(-1);
     return -1;
   }
@@ -86,7 +86,7 @@ int read(int fd, void* buffer, unsigned size) {
 }
 
 int write(int fd, void* buffer, unsigned size) {
-  if (fd < 1 || fd > 129) {
+  if (fd < 1 || fd >= FD_TABLE_SIZE) {
     exit(-1);
     return -1;
   }
@@ -114,7 +114,7 @@ int write(int fd, void* buffer, unsigned size) {
 
 void seek(int fd, unsigned position) {
   struct file** fd_table = thread_current()->fd_table;
-  if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
+  if (fd < 2 || fd >= FD_TABLE_SIZE || fd_table[fd] == NULL) {
     exit(-1);
     return -1;
   }
@@ -124,7 +124,7 @@ void seek(int fd, unsigned position) {
 
 unsigned tell(int fd) {
   struct file** fd_table = thread_current()->fd_table;
-  if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
+  if (fd < 2 || fd >= FD_TABLE_SIZE || fd_table[fd] == NULL) {
     exit(-1);
     return -1;
   }
@@ -134,7 +134,7 @@ unsigned tell(int fd) {
 
 void close(int fd) {
   struct file** fd_table = thread_current()->fd_table;
-  if (fd < 2 || fd > 129 || fd_table[fd] == NULL) {
+  if (fd < 2 || fd >= FD_TABLE_SIZE || fd_table[fd] == NULL) {
     exit(-1);
     return;
   } else {

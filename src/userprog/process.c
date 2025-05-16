@@ -41,6 +41,10 @@ tid_t process_execute(const char* file_name) {
 
   // To pass only command name instead of the whole line with arguments
   char* command = malloc(sizeof(char) * (strlen(file_name) + 1));
+  if (command == NULL) {
+    palloc_free_page(fn_copy);
+    return -1;
+  }
   strlcpy(command, file_name, strlen(file_name) + 1);
   char* save_ptr;
   strtok_r(command, " ", &save_ptr);
@@ -145,6 +149,10 @@ static void push_argv(int argc, char** argv, void** esp) {
 static void start_process(void* file_name_) {
   // char *file_name = file_name_;
   char* file_name = malloc(sizeof(char) * (strlen(file_name_) + 1));
+  if (file_name == NULL) {
+    palloc_free_page(file_name_);
+    thread_exit();
+  }
   strlcpy(file_name, file_name_, strlen(file_name_) + 1);
   struct intr_frame if_;
   bool success;
@@ -156,6 +164,11 @@ static void start_process(void* file_name_) {
        token = strtok_r(NULL, " ", &save_ptr))
     argc++;
   char** argv = malloc(sizeof(char*) * argc);
+  if (argv == NULL) {
+    palloc_free_page(file_name_);
+    free(file_name);
+    thread_exit();
+  }
 
   // Get the values of argv array
   strlcpy(file_name, file_name_, strlen(file_name_) + 1);
@@ -229,6 +242,12 @@ void process_exit(void) {
   sema_down(&(cur->exit_sema));
   list_remove(&(cur->childelem));
 
+  // Close files that process opened
+  int i;
+  for (i = 2; i < FD_TABLE_SIZE; i++) {
+    if (!cur->fd_table[i])
+      file_close(cur->fd_table[i]);
+  }
   file_close(cur->executable);
 
   /* Destroy the current process's page directory and switch back
