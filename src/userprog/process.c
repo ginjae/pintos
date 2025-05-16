@@ -245,10 +245,17 @@ void process_exit(void) {
   // Close files that process opened
   int i;
   for (i = 2; i < FD_TABLE_SIZE; i++) {
-    if (!cur->fd_table[i])
+    if (cur->fd_table[i] != NULL) {
       file_close(cur->fd_table[i]);
+      cur->fd_table[i] = NULL;
+    }
   }
-  file_close(cur->executable);
+
+  // Close its executable file
+  if (cur->executable != NULL) {
+    file_close(cur->executable);
+    cur->executable = NULL;
+  }
 
   // Call wait for all children
   struct list_elem* e;

@@ -504,6 +504,7 @@ static void init_thread(struct thread* t, const char* name, int priority) {
   sema_init(&(t->load_sema), 0);
 
   t->load_status = true;
+  t->executable = NULL;
 #endif
 }
 
