@@ -250,6 +250,14 @@ void process_exit(void) {
   }
   file_close(cur->executable);
 
+  // Call wait for all children
+  struct list_elem* e;
+  for (e = list_begin(&(thread_current()->children));
+      e != list_end(&(thread_current()->children)); e = list_next(e)) {
+    struct thread* t = list_entry(e, struct thread, childelem);
+    process_wait(t->tid);
+  }
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
