@@ -57,13 +57,17 @@ tid_t process_execute(const char* file_name) {
   */
 
   /* Create a new thread to execute FILE_NAME. */
-  int current_pri = thread_get_priority();
-  if (current_pri == PRI_MAX - 1) return -1;
-  tid = thread_create(command, current_pri + 1, start_process, fn_copy);
+  // int current_pri = thread_get_priority();
+  // if (current_pri == PRI_MAX - 1) return -1;
+  // tid = thread_create(command, current_pri + 1, start_process, fn_copy);
+  tid = thread_create(command, PRI_DEFAULT, start_process, fn_copy);
+
   if (tid == TID_ERROR)
     palloc_free_page(fn_copy);
-  else if (tid == -2)  // load failure
-    tid = -1;
+  // else if (tid == -2) {   // load failure
+  //   tid = -1;
+  //   palloc_free_page(fn_copy);
+  // }
   free(command);
   return tid;
 }
@@ -166,6 +170,7 @@ static void start_process(void* file_name_) {
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load(argv[0], &if_.eip, &if_.esp);
+  sema_up(&(thread_current()->load_sema));
 
   if (success) push_argv(argc, argv, &if_.esp);
 
@@ -426,7 +431,8 @@ done:
   if (!success) {
     // printf("Load failed! Current pid is: %d, which should be -1\n",
     // thread_current()->tid);
-    thread_current()->tid = -2;  // specify load failure
+    // thread_current()->tid = -2;  // specify load failure
+    thread_current()->load_status = false;
   } else {
     t->executable = file;
     file_deny_write(file);

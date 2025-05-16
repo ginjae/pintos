@@ -193,8 +193,21 @@ static void syscall_handler(struct intr_frame* f) {
 
       tid_t pid;
       pid = process_execute((const void*)*(uint32_t*)(f->esp + 4));
-      f->eax = pid;  // FIXME...? : It should return pid - 1
-                     // but for some reason, it works.
+
+      // Search point to thread created, then wait for its loading
+      // If the loading failed, return value should become -1
+      struct list_elem* e;
+      for (e = list_begin(&(thread_current()->children));
+          e != list_end(&(thread_current()->children)); e = list_next(e)) {
+        struct thread* t = list_entry(e, struct thread, childelem);
+        if (t->tid == pid) {
+          sema_down(&(t->load_sema));
+          if (!t->load_status)
+            pid = -1;
+          break;
+        }
+      }
+      f->eax = pid;
       break;
 
     case SYS_WAIT:
