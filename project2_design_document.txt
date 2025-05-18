@@ -96,18 +96,19 @@ Munseong Son <osoli6949@unist.ac.kr>
     stdin (fd 0) and stdout (fd 1), although open() never return these
     two values.
 
-   Others:
-   struct thread* parent;                   /* Parent process */
-   struct list children;                    /* List of child processes */
-   struct list_elem childelem;              /* List element for child processes list */
+   3. In thread.h (for proces):
+   struct thread* parent; -> indicates who the parent is
+   struct list children; -> constructs a list of child processes
+   struct list_elem childelem; -> becomes the list element for child processes list of parent
 
-   struct semaphore child_sema;             /* Semaphore for waiting child */
-   struct semaphore exit_sema;              /* Semaphore for right order of exiting */
-   struct semaphore load_sema;              /* Semaphore for waiting for load */
+   struct semaphore child_sema; -> semaphore for waiting termination of child
+   struct semaphore exit_sema; -> semaphore for right order of exiting
+                                  (to make sure that exit status is saved)
+   struct semaphore load_sema; -> semaphore for completion of loading before returning exec
 
-   bool load_status;                        /* Loaded successfully or not */
-   int exit_status;                         /* Return value of calling exit */
-   struct file* executable;                 /* Current running file */
+   bool load_status; -> to pass whether loading was successfully or not */
+   int exit_status; -> return-value of calling exit
+   struct file* executable; -> current running file (to deny writing while running it)
 
 >> B2: Describe how file descriptors are associated with open files.
 >> Are file descriptors unique within the entire OS or just within a
@@ -180,8 +181,9 @@ Munseong Son <osoli6949@unist.ac.kr>
       whose thread's tid is child_tid. If such process does not exist, return -1.
 
    2. Wait until the child process terminates by waiting semaphore "child_sema".
-      After that, record that child's exit status and release child_sema.
-      Finally, return the recorded exit status.
+      After that, record that child's exit status and sema_up another semaphore
+      "exit_sema" to continue the child's exitting. Finally, return the recorded
+      exit status.
 
 >> B6: Any access to user program memory at a user-specified address
 >> can fail due to a bad pointer value.  Such accesses must cause the
@@ -205,7 +207,9 @@ Munseong Son <osoli6949@unist.ac.kr>
    In addition, pagedir_get_page() is called once more after check_valid() in some
    cases where the argument is pointer to the pointer.
 
-   Resources are freed via exit(-1) call, which calls thread_exit(), which ensures
+   Lock that is used to prevent from trying two concurrent writes one same file is
+   released when the bad conditon is detected, but before return the value -1.
+   Rest of the resources are freed via exit(-1) call, which calls thread_exit(), which ensures
    that every resource that thread acquired is freed.
 
    In some edge cases (ex. *(int *)NULL in bad-read.c), exception.c assigns -1 to that 
@@ -220,9 +224,9 @@ Munseong Son <osoli6949@unist.ac.kr>
 >> success/failure status passed back to the thread that calls "exec"?
 
 -> We implement load_status, which becomes false if load() fails.
-   "exec" waits its child process by searching its children list to find the process
-   corresponds with the result pid, waiting its "load_sema", which is released
-   after load().
+   "exec" waits its child process's loading by searching its children list to find
+   the process corresponds with the result pid, then waiting its "load_sema", which is
+   released after load().
 
    If that child's load_status is false, return -1. Otherwise return child's pid. 
 
@@ -234,9 +238,9 @@ Munseong Son <osoli6949@unist.ac.kr>
 >> there any special cases?
 
 -> Resources are freed in thread_exit(), so no additional resource management
-   is required. Semaphore "child_sema" prevents race condition from happening
-   by forcing parent process to wait its child to exit, and semaphore "exit_sema"
-   prevents child process from dying before parent process acquire its return value.
+   is required. Semaphore "child_sema" is used to wait for its child to exit,
+   and semaphore "exit_sema" prevents child process from freeing all its resources
+   including its exit status before parent process acquire its return value.
 
 ---- RATIONALE ----
 
@@ -265,12 +269,14 @@ Munseong Son <osoli6949@unist.ac.kr>
                  CONTRIBUTION
                  ============
 
-Jaemin Kim (50%): Overall project planning & management. implementation
+Jaemin Kim (40%): Overall project planning & management. implementation
 of process_wait and push_argv, halt() and wait(). Provided skeleton code
-of syscall_init() function. Equal contribution to project2-2.
+of syscall handler function. In project 2-2, Worked mostly with synchronization
+problem and resource management.
 
-Munseong Son (50%): Implemented sanity check of syscall_init function
+Munseong Son (60%): Implemented sanity check of syscall_init function
 and stack overflow check in push_argv. Implemented create, open, close function.
-Equal contribution to project2-2.
+In project 2-2, Added the initial version of most syscall functions and suggested
+a list of things to do.
 
--> 50:50 contribution.
+-> 40:60 contribution.
