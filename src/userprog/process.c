@@ -61,13 +61,9 @@ tid_t process_execute(const char* file_name) {
   */
 
   /* Create a new thread to execute FILE_NAME. */
-  // int current_pri = thread_get_priority();
-  // if (current_pri == PRI_MAX - 1) return -1;
-  // tid = thread_create(command, current_pri + 1, start_process, fn_copy);
   tid = thread_create(command, PRI_DEFAULT, start_process, fn_copy);
 
-  if (tid == TID_ERROR)
-    palloc_free_page(fn_copy);
+  if (tid == TID_ERROR) palloc_free_page(fn_copy);
   // else if (tid == -2) {   // load failure
   //   tid = -1;
   //   palloc_free_page(fn_copy);
@@ -260,7 +256,7 @@ void process_exit(void) {
   // Call wait for all children
   struct list_elem* e;
   for (e = list_begin(&(thread_current()->children));
-      e != list_end(&(thread_current()->children)); e = list_next(e)) {
+       e != list_end(&(thread_current()->children)); e = list_next(e)) {
     struct thread* t = list_entry(e, struct thread, childelem);
     process_wait(t->tid);
   }

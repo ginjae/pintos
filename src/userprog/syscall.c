@@ -177,8 +177,7 @@ static void syscall_handler(struct intr_frame* f) {
       // pid_t exec (const char *cmd_line)
 
       // Runs the executable whose name is given in cmd line, passing any given
-      // arguments, and returns the new process’s program id(pid). Must return
-      // pid - 1,
+      // arguments, and returns the new process’s program id(pid).
 
       // tid_t process_execute(const char* file_name) // in process.c
 
@@ -198,12 +197,11 @@ static void syscall_handler(struct intr_frame* f) {
       // If the loading failed, return value should become -1
       struct list_elem* e;
       for (e = list_begin(&(thread_current()->children));
-          e != list_end(&(thread_current()->children)); e = list_next(e)) {
+           e != list_end(&(thread_current()->children)); e = list_next(e)) {
         struct thread* t = list_entry(e, struct thread, childelem);
         if (t->tid == pid) {
           sema_down(&(t->load_sema));
-          if (!t->load_status)
-            pid = -1;
+          if (!t->load_status) pid = -1;
           break;
         }
       }
@@ -217,12 +215,10 @@ static void syscall_handler(struct intr_frame* f) {
       // Implementing this system call requires considerably more work than any
       // of the rest.
 
-      // int process_wait(tid_t child_tid) // in process.c (Not implemented
-      // yet!)
+      // int process_wait(tid_t child_tid) // in process.c
 
       check_valid(f->esp + 4);
       f->eax = process_wait((tid_t) * (uint32_t*)(f->esp + 4));
-
       break;
 
     case SYS_CREATE:
