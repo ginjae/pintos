@@ -128,6 +128,10 @@ Munseong Son <osoli6949@unist.ac.kr>
    arguments. Then acquire the lock named "filesys_lock" to prevent race condition.
    This lock is released before returning.
 
+   This lock is used not only on reading and writing, but also in other file system
+   codes such as exec() to ensure that only one process at a time is executing file
+   system code.
+
 -> 1. int read(int fd, void* buffer, unsigned size)
       After acquiring the lock named "filesys_lock" to ensure there is no
       race condition, read() checks fd(file descriptor).
