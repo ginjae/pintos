@@ -115,6 +115,7 @@ struct thread
    struct semaphore exit_sema;              /* Semaphore for right order of exiting */
    struct semaphore load_sema;              /* Semaphore for waiting for load */
 
+   bool wait_status;                        /* Parent process is waiting for it or not */
    bool load_status;                        /* Loaded successfully or not */
    int exit_status;                         /* Return value of calling exit */
    struct file* executable;                 /* Current running file */

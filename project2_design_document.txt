@@ -106,7 +106,8 @@ Munseong Son <osoli6949@unist.ac.kr>
                                   (to make sure that exit status is saved)
    struct semaphore load_sema; -> semaphore for completion of loading before returning exec
 
-   bool load_status; -> to pass whether loading was successfully or not */
+   bool wait_status; -> to check parent process has already call wait for it or not
+   bool load_status; -> to pass whether loading was successfully or not
    int exit_status; -> return-value of calling exit
    struct file* executable; -> current running file (to deny writing while running it)
 
