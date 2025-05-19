@@ -30,8 +30,8 @@ int open(const char* file) {
   struct file** fd_table = thread_current()->fd_table;
   lock_acquire(&filesys_lock);
   struct file* f = filesys_open(file);
-  lock_release(&filesys_lock);
   if (f == NULL) {
+    lock_release(&filesys_lock);
     return -1;  // error
   }
 
@@ -39,9 +39,11 @@ int open(const char* file) {
   for (i = 2; i < 130; i++) {
     if (fd_table[i] == NULL) {
       fd_table[i] = f;
+      lock_release(&filesys_lock);
       return i;
     }
   }
+  lock_release(&filesys_lock);
   return -1;
 }
 
@@ -55,7 +57,10 @@ int filesize(int fd) {
   if (f == NULL) {
     return -1;  // error
   }
-  return file_length(f);
+  lock_acquire(&filesys_lock);
+  int ret = file_length(f);
+  lock_release(&filesys_lock);
+  return ret;
 }
 
 int read(int fd, void* buffer, unsigned size) {
@@ -118,8 +123,10 @@ void seek(int fd, unsigned position) {
     exit(-1);
     return -1;
   }
+  lock_acquire(&filesys_lock);
   struct file* f = fd_table[fd];
   file_seek(f, position);
+  lock_release(&filesys_lock);
 }
 
 unsigned tell(int fd) {
@@ -128,8 +135,11 @@ unsigned tell(int fd) {
     exit(-1);
     return -1;
   }
+  lock_acquire(&filesys_lock);
   struct file* f = fd_table[fd];
-  return file_tell(f);
+  unsigned ret = file_tell(f);
+  lock_release(&filesys_lock);
+  return ret;
 }
 
 void close(int fd) {
@@ -138,8 +148,10 @@ void close(int fd) {
     exit(-1);
     return;
   } else {
+    lock_acquire(&filesys_lock);
     file_close(fd_table[fd]);
     fd_table[fd] = NULL;
+    lock_release(&filesys_lock);
     return;
   }
 }
@@ -191,7 +203,9 @@ static void syscall_handler(struct intr_frame* f) {
       }
 
       tid_t pid;
+      lock_acquire(&filesys_lock);
       pid = process_execute((const void*)*(uint32_t*)(f->esp + 4));
+      lock_release(&filesys_lock);
 
       // Search point to thread created, then wait for its loading
       // If the loading failed, return value should become -1
