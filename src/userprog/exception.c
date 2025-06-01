@@ -147,8 +147,9 @@ static void page_fault(struct intr_frame* f) {
   printf("Page fault at %p: %s error %s page in %s context.\n", fault_addr,
          not_present ? "not present" : "rights violation",
          write ? "writing" : "reading", user ? "user" : "kernel");
-  #ifdef USERPROG
-  printf("%s: exit(%d)\n", thread_name(), thread_current()->exit_status);  // FIXME: pseudo-calling exit()
-  #endif
+#ifdef USERPROG
+  printf("%s: exit(%d)\n", thread_name(),
+         thread_current()->exit_status);  // FIXME: pseudo-calling exit()
+#endif
   kill(f);
 }

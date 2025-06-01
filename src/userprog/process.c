@@ -217,7 +217,7 @@ int process_wait(tid_t child_tid) {
        e != list_end(&(thread_current()->children)); e = list_next(e)) {
     struct thread* t = list_entry(e, struct thread, childelem);
     if (t->tid == child_tid) {
-      if (t->wait_status == true)    // If wait is already called, return -1
+      if (t->wait_status == true)  // If wait is already called, return -1
         return -1;
       sema_down(&(t->child_sema));   // Wait until child process exiting
       t->wait_status = true;         // Wait is already called
