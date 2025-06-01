@@ -30,7 +30,7 @@ static bool load(const char* cmdline, void (**eip)(void), void** esp);
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
 tid_t process_execute(const char* file_name) {
-  char* fn_copy;
+  char* fn_copy;  // Kernel virtual address
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
@@ -49,25 +49,10 @@ tid_t process_execute(const char* file_name) {
   char* save_ptr;
   strtok_r(command, " ", &save_ptr);
 
-  // If no such executable is found, return -1
-  /*
-  struct file* file = filesys_open(command);
-  if (!file) {
-    palloc_free_page(fn_copy);
-    free(command);
-    return -1;
-  }
-  file_close(file);
-  */
-
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create(command, PRI_DEFAULT, start_process, fn_copy);
 
   if (tid == TID_ERROR) palloc_free_page(fn_copy);
-  // else if (tid == -2) {   // load failure
-  //   tid = -1;
-  //   palloc_free_page(fn_copy);
-  // }
   free(command);
   return tid;
 }

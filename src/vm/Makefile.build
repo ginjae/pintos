@@ -1,3 +1,0 @@
-vm_SRC += vm/page.c
-vm_SRC += vm/frame.c
-vm_SRC += vm/swap.c
