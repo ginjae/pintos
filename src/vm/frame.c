@@ -36,7 +36,6 @@
 
 /* Default implementation for frame. (without swap or evict, etc.)*/
 struct frame {
-  bool is_free;                 // whether it is free or allocated
   void* frame_addr;             // allocated frame's address.
   void* page_addr;              // if it's allocated, to which page?
   struct thread* owner_thread;  // what process owns this frame?
@@ -49,13 +48,21 @@ static struct list frame_table;
 //    to replace palloc_get_page() in process.c
 
 void frame_table_init(size_t user_frame_limit) {
+  // initialize list frame_table.
+}
+
+void* frame_alloc(enum palloc_flags, uint8_t* upage,
+                  struct thread* owner_thread) {
   // Pseudocode (not sure!)
 
   /*
-  WHILE palloc_get_page != null: (aka: "not framed" memory exists)
-    i) create new struct frame
-    ii) assign palloc's result to member void* frame_addr
-    iii) set is_free to true
-    iv) push struct into static struct list frame_table.
+  i) create new struct frame
+  ii) assign palloc's result to member void* frame_addr
+  iii) assign address upage to member void* page_addr
+  iv) assign argument owner_thread to member owner_thread
+  v) push struct into static struct list frame_table.
   */
+
+  // note: iv) might be unnecessary since we can use thread_current()
+  //       but just in case!
 }
