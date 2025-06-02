@@ -6,14 +6,19 @@
 #include <bitmap.h>
 #include <debug.h>
 #include <inttypes.h>
+#include <list.h>
+#include <palloc.h>
 #include <round.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "threads/loader.h"
+#include "threads/pte.h"
 #include "threads/synch.h"
+#include "threads/thread.h"
 #include "threads/vaddr.h"
 
 // TODO
@@ -29,5 +34,28 @@
 //      a) Whether each frame is free or allocated
 //      b) If it is allocated, to which page of which process(es)
 
+/* Default implementation for frame. (without swap or evict, etc.)*/
+struct frame {
+  bool is_free;                 // whether it is free or allocated
+  void* frame_addr;             // allocated frame's address.
+  void* page_addr;              // if it's allocated, to which page?
+  struct thread* owner_thread;  // what process owns this frame?
+};
+
+/* Frame table that keeps track of all available frames. */
+static struct list frame_table;
+
 // 2. Define frame table allocator. (say falloc_get_frame()...?)
 //    to replace palloc_get_page() in process.c
+
+void frame_table_init(size_t user_frame_limit) {
+  // Pseudocode (not sure!)
+
+  /*
+  WHILE palloc_get_page != null: (aka: "not framed" memory exists)
+    i) create new struct frame
+    ii) assign palloc's result to member void* frame_addr
+    iii) set is_free to true
+    iv) push struct into static struct list frame_table.
+  */
+}
