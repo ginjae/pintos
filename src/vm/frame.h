@@ -6,7 +6,7 @@
 #include "threads/palloc.h"
 
 // Initialize list object named frame_table
-void frame_table_init(size_t user_frame_limit);
+void frame_table_init(size_t user_frame_limit UNUSED);
 
 // Find frame with physical address. (call this with frame_lock!)
 struct frame* find_frame(void* kpage);

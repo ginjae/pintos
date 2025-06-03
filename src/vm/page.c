@@ -37,4 +37,30 @@ This "metadata" includes:
 
 */
 
-struct page {};
+struct page {
+  void *page_addr;   // upage
+  void *frame_addr;  // kpage
+  int load_bytes;    // PGSIZE - (load_size % PGSIZE) = zero region
+  bool is_writable;  // is writing on this page allowed?
+  size_t swap_i;     // index for backing store (swapped page end up there)
+  enum page_purpose purpose;  // Purpose for this page
+
+  struct hash_elem SPT_elem;  // hash elem for hash SPT
+};
+
+struct hash SPT;
+
+unsigned SPT_hash(const struct hash_elem *e, void *aux) {
+  struct page *p = hash_entry(e, struct page, SPT_elem);
+  return pt_no(p->page_addr);
+}
+
+bool SPT_less(const struct hash_elem *a, const struct hash_elem *b, void *aux) {
+  struct page *p_a = hash_entry(a, struct page, SPT_elem);
+  struct page *p_b = hash_entry(b, struct page, SPT_elem);
+  return p_a->page_addr < p_b->page_addr;
+}
+
+void SPT_init(size_t user_frame_limit) {
+  hash_init(&SPT, SPT_hash, SPT_less, NULL);
+}

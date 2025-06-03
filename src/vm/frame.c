@@ -54,7 +54,7 @@ static struct lock frame_lock;
 // 2. Define frame table allocator.
 //    to replace palloc_get_page(PAL_USER) in process.c
 
-void frame_table_init(size_t user_frame_limit) {
+void frame_table_init(size_t user_frame_limit UNUSED) {
   list_init(&frame_table);  // initialize list frame_table.
   lock_init(&frame_lock);   // initialize frame lock.
 }
