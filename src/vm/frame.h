@@ -8,17 +8,19 @@
 // Initialize list object named frame_table
 void frame_table_init(size_t user_frame_limit);
 
-// Pick frame with just kpage address.
-// Note: call this with frame_lock!
+// Find frame with physical address. (call this with frame_lock!)
 struct frame* find_frame(void* kpage);
 
-// Note: our goal is to replace palloc functions in process.c
-//       I think load_segment() and install_page() should be considered.
+// Update frame's last accessed time. (Probably needed later.)
+void frame_time_update(void* kpage);
+
+// Allocate frame & update frame table.
 void* frame_alloc(enum palloc_flags);
 
 // Set upage of corresponding struct frame.
 void frame_update_upage(void* upage, void* kpage);
 
-void frame_free(void*);
+// Free frame with corresponding physical address.
+void frame_free(void* kpage);
 
 #endif /* vm/frame.h */

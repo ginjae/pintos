@@ -38,9 +38,9 @@
 
 /* Default implementation for frame. (without swap or evict, etc.) */
 struct frame {
-  void* frame_addr;              // allocated frame's address.
-  void* page_addr;               // if it's allocated, to which page?
-  struct thread* owner_thread;   // what process owns this frame?
+  void* frame_addr;              // allocated frame's address. (=kpage)
+  void* page_addr;               // virtual address pointing to frame. (=upage)
+  struct thread* owner_thread;   // Process(thread) who owns this frame
   struct list_elem ftable_elem;  // list element for frame table list
   int64_t access_time;           // last accessed time (probably needed later)
 };
@@ -60,6 +60,7 @@ void frame_table_init(size_t user_frame_limit) {
 }
 
 struct frame* find_frame(void* kpage) {
+  // frame table is empty: return NULL
   if (list_empty(&frame_table)) return NULL;
 
   struct list_elem* e;
@@ -71,7 +72,15 @@ struct frame* find_frame(void* kpage) {
     if (f->frame_addr == kpage) return f;
   }
 
+  // No such frame is found: return NULL.
   return NULL;
+}
+
+void frame_time_update(void* kpage) {
+  lock_acquire(&frame_lock);
+  struct frame* f = find_frame(kpage);
+  f->access_time = timer_ticks();
+  lock_release(&frame_lock);
 }
 
 void* frame_alloc(enum palloc_flags flags) {
@@ -95,6 +104,7 @@ void* frame_alloc(enum palloc_flags flags) {
   // v) push struct into static struct list frame_table.
   //    since this is the critical section, use lock!
   lock_acquire(&frame_lock);
+  // FIXME: We probably should use some kind of sorting...? Not sure.
   list_push_back(&frame_table, &new_frame->ftable_elem);
   lock_release(&frame_lock);
 
@@ -117,8 +127,7 @@ void frame_free(void* kpage) {
 
   lock_acquire(&frame_lock);
 
-  // Note: list_empty is, in fact, reading. (obviously...)
-  //       So it is critical section, and requires lock.
+  // Note: list_empty is critical section, so it requires lock.
   if (list_empty(&frame_table)) {
     lock_release(&frame_lock);
     return;
@@ -128,9 +137,15 @@ void frame_free(void* kpage) {
        e = list_next(e)) {
     f = list_entry(e, struct frame, ftable_elem);
     if (f->frame_addr == kpage) {
+      // update frame table
       list_remove(e);
+
+      // allocated by palloc_get_page(PAL_USER)
       palloc_free_page(f->frame_addr);
+
+      // allocated by malloc(sizeof(struct frame))
       free(f);
+
       break;
     }
   }
