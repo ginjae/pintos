@@ -12,6 +12,8 @@
 #include <string.h>
 
 #include "devices/timer.h"
+#include "filesys/file.h"
+#include "filesys/filesys.h"
 #include "threads/loader.h"
 #include "threads/malloc.h"
 #include "threads/palloc.h"
@@ -40,10 +42,14 @@ This "metadata" includes:
 struct page {
   void *page_addr;   // upage
   void *frame_addr;  // kpage
-  int load_bytes;    // PGSIZE - (load_size % PGSIZE) = zero region
+
   bool is_writable;  // is writing on this page allowed?
   size_t swap_i;     // index for backing store (swapped page end up there)
   enum page_purpose purpose;  // Purpose for this page
+
+  struct file *page_file;  // file for read (if purpose == FOR_FILE)
+  size_t load_bytes;       // size of read
+  size_t zero_bytes;       // size of remaining page (should be zeroed)
 
   struct hash_elem SPT_elem;  // hash elem for hash SPT
 };
