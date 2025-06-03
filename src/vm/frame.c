@@ -7,8 +7,6 @@
 #include <debug.h>
 #include <inttypes.h>
 #include <list.h>
-#include <malloc.h>
-#include <palloc.h>
 #include <round.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -18,6 +16,8 @@
 
 #include "devices/timer.h"
 #include "threads/loader.h"
+#include "threads/malloc.h"
+#include "threads/palloc.h"
 #include "threads/pte.h"
 #include "threads/synch.h"
 #include "threads/thread.h"

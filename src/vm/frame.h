@@ -1,8 +1,9 @@
 #ifndef FRAME_H
 #define FRAME_H
 
-#include <palloc.h>
 #include <stddef.h>
+
+#include "threads/palloc.h"
 
 // Initialize list object named frame_table
 void frame_table_init(size_t user_frame_limit);
