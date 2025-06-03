@@ -4,8 +4,7 @@
 #include <palloc.h>
 #include <stddef.h>
 
-// Divide the entire memory into frames.
-// Note: Considering using while loop and palloc_get_page()
+// Initialize list object named frame_table
 void frame_table_init(size_t user_frame_limit);
 
 // Note: our goal is to replace palloc functions in process.c

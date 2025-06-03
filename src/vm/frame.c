@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "devices/timer.h"
 #include "threads/loader.h"
 #include "threads/pte.h"
 #include "threads/synch.h"
@@ -34,21 +35,24 @@
 //      a) Whether each frame is free or allocated
 //      b) If it is allocated, to which page of which process(es)
 
-/* Default implementation for frame. (without swap or evict, etc.)*/
+/* Default implementation for frame. (without swap or evict, etc.) */
 struct frame {
-  void* frame_addr;             // allocated frame's address.
-  void* page_addr;              // if it's allocated, to which page?
-  struct thread* owner_thread;  // what process owns this frame?
+  void* frame_addr;              // allocated frame's address.
+  void* page_addr;               // if it's allocated, to which page?
+  struct thread* owner_thread;   // what process owns this frame?
+  struct list_elem ftable_elem;  // list element for frame table list
+  // int64_t access_time;        // last accessed time (probably needed later)
 };
 
 /* Frame table that keeps track of all available frames. */
 static struct list frame_table;
 
-// 2. Define frame table allocator. (say falloc_get_frame()...?)
-//    to replace palloc_get_page() in process.c
+// 2. Define frame table allocator.
+//    to replace palloc_get_page(PAL_USER) in process.c
 
 void frame_table_init(size_t user_frame_limit) {
   // initialize list frame_table.
+  list_init(&frame_table);
 }
 
 void* frame_alloc(enum palloc_flags, uint8_t* upage,
@@ -56,11 +60,13 @@ void* frame_alloc(enum palloc_flags, uint8_t* upage,
   // Pseudocode (not sure!)
 
   /*
+
   i) create new struct frame
   ii) assign palloc's result to member void* frame_addr
   iii) assign address upage to member void* page_addr
   iv) assign argument owner_thread to member owner_thread
   v) push struct into static struct list frame_table.
+
   */
 
   // note: iv) might be unnecessary since we can use thread_current()
