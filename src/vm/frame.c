@@ -22,34 +22,9 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "vm/page.h"
 
 // TODO
-
-// 1. Define frame table & frame.
-
-//    OS must maintain the following informations:
-//      a) Which frames are allocated
-//      b) Which frames are available
-//      c) How many total frames are there
-
-//    Frame table has one entry for each physical page frame, including:
-//      a) Whether each frame is free or allocated
-//      b) If it is allocated, to which page of which process(es)
-
-/* Default implementation for frame. (without swap or evict, etc.) */
-struct frame {
-  void* frame_addr;              // allocated frame's address. (=kpage)
-  void* page_addr;               // virtual address pointing to frame. (=upage)
-  struct thread* owner_thread;   // Process(thread) who owns this frame
-  struct list_elem ftable_elem;  // list element for frame table list
-  int64_t access_time;           // last accessed time (probably needed later)
-};
-
-/* Frame table that keeps track of all available frames. */
-static struct list frame_table;
-
-/* Lock for frame_alloc, which is critical section. */
-static struct lock frame_lock;
 
 // 2. Define frame table allocator.
 //    to replace palloc_get_page(PAL_USER) in process.c
@@ -89,8 +64,8 @@ void* frame_alloc(enum palloc_flags flags) {
 
   // ii) assign palloc's result to member void* frame_addr
   uint8_t* kpage = palloc_get_page(flags);
-  if (!kpage) {
-    free(new_frame);
+  if (!kpage) {   // have to use page replacement algorithm
+    struct page* victim = get_victim();
     return NULL;
   }
   new_frame->frame_addr = kpage;
