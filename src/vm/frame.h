@@ -24,7 +24,7 @@ struct frame {
   void* page_addr;               // virtual address pointing to frame. (=upage)
   struct thread* owner_thread;   // Process(thread) who owns this frame
   struct list_elem ftable_elem;  // list element for frame table list
-  int64_t access_time;           // last accessed time (probably needed later)
+  // int64_t access_time;        // redundant for second chance
 };
 
 /* Frame table that keeps track of all available frames. */
@@ -33,14 +33,17 @@ static struct list frame_table;
 /* Lock for frame_alloc, which is critical section. */
 static struct lock frame_lock;
 
+/* Cursor to imitate circular list behavior. */
+static struct list_elem* ft_cursor = NULL;
+
 // Initialize list object named frame_table
 void frame_table_init(size_t user_frame_limit);
 
 // Find frame with physical address. (call this with frame_lock!)
 struct frame* find_frame(void* kpage);
 
-// Update frame's last accessed time. (Probably needed later.)
-void frame_time_update(void* kpage);
+// Returns victim frame via second chance algorithm.
+struct frame* find_victim();
 
 // Allocate frame & update frame table.
 void* frame_alloc(enum palloc_flags);

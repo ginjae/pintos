@@ -22,6 +22,7 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/pagedir.h"
 #include "vm/page.h"
 
 // TODO
@@ -29,7 +30,7 @@
 // 2. Define frame table allocator.
 //    to replace palloc_get_page(PAL_USER) in process.c
 
-void frame_table_init(size_t user_frame_limit UNUSED) {
+void frame_table_init(size_t user_frame_limit) {
   list_init(&frame_table);  // initialize list frame_table.
   lock_init(&frame_lock);   // initialize frame lock.
 }
@@ -51,11 +52,42 @@ struct frame* find_frame(void* kpage) {
   return NULL;
 }
 
-void frame_time_update(void* kpage) {
+struct frame* find_victim() {
+  // frame table is empty: return NULL
+  if (list_empty(&frame_table)) return NULL;
+  if (!ft_cursor) ft_cursor = list_begin(&frame_table);
+
+  struct frame* f;
+  uint32_t* pagedir;
+  size_t loop_lim = 4096;
+  size_t counter = 0;
+
   lock_acquire(&frame_lock);
-  struct frame* f = find_frame(kpage);
-  f->access_time = timer_ticks();
+
+  while (counter < loop_lim) {
+    f = list_entry(ft_cursor, struct frame, ftable_elem);
+    pagedir = f->owner_thread->pagedir;
+
+    if (pagedir_is_accessed(pagedir, f->page_addr)) {
+      pagedir_set_accessed(pagedir, f->page_addr, false);
+      ft_cursor = list_next(ft_cursor);
+      if (ft_cursor == list_end(&frame_table))
+        ft_cursor = list_begin(&frame_table);
+      counter++;
+    } else {
+      struct list_elem* victim_cursor = ft_cursor;
+      ft_cursor = list_next(ft_cursor);
+      if (ft_cursor == list_end(&frame_table))
+        ft_cursor = list_begin(&frame_table);
+      list_remove(victim_cursor);
+      break;
+    }
+  }
+  if (list_empty(&frame_table)) ft_cursor = NULL;
+
   lock_release(&frame_lock);
+
+  return f;
 }
 
 void* frame_alloc(enum palloc_flags flags) {
@@ -64,7 +96,7 @@ void* frame_alloc(enum palloc_flags flags) {
 
   // ii) assign palloc's result to member void* frame_addr
   uint8_t* kpage = palloc_get_page(flags);
-  if (!kpage) {   // have to use page replacement algorithm
+  if (!kpage) {  // have to use page replacement algorithm
     struct page* victim = get_victim();
     return NULL;
   }
@@ -73,14 +105,14 @@ void* frame_alloc(enum palloc_flags flags) {
   // iii) assign current thread to member owner_thread
   new_frame->owner_thread = thread_current();
 
-  // iv) record access time
-  new_frame->access_time = timer_ticks();
+  // iv) record access time (redundant for second chance)
+  // new_frame->access_time = timer_ticks();
 
   // v) push struct into static struct list frame_table.
   //    since this is the critical section, use lock!
   lock_acquire(&frame_lock);
-  // FIXME: We probably should use some kind of sorting...? Not sure.
   list_push_back(&frame_table, &new_frame->ftable_elem);
+  if (!ft_cursor) ft_cursor = list_begin(&frame_table);
   lock_release(&frame_lock);
 
   // vi) return kernel virtual address (physical address)
