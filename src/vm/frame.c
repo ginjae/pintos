@@ -79,11 +79,11 @@ struct frame* find_victim() {
       ft_cursor = list_next(ft_cursor);
       if (ft_cursor == list_end(&frame_table))
         ft_cursor = list_begin(&frame_table);
-      list_remove(victim_cursor);
+      // list_remove(victim_cursor);
       break;
     }
   }
-  if (list_empty(&frame_table)) ft_cursor = NULL;
+  // if (list_empty(&frame_table)) ft_cursor = NULL;
 
   lock_release(&frame_lock);
 
@@ -97,8 +97,9 @@ void* frame_alloc(enum palloc_flags flags) {
   // ii) assign palloc's result to member void* frame_addr
   uint8_t* kpage = palloc_get_page(flags);
   if (!kpage) {  // have to use page replacement algorithm
-    struct page* victim = get_victim();
-    return NULL;
+    struct page* victim = find_victim();
+    palloc_free_page(victim->page_addr);
+    kpage = palloc_get_page(flags);
   }
   new_frame->frame_addr = kpage;
 
@@ -117,6 +118,33 @@ void* frame_alloc(enum palloc_flags flags) {
 
   // vi) return kernel virtual address (physical address)
   return kpage;
+}
+
+void frame_add(void *page_addr, void* frame_addr, struct thread* t) {
+  struct list_elem* e;
+  struct frame *f;
+  lock_acquire(&frame_lock);
+
+  for (e = list_begin(&frame_table); e != list_end(&frame_table);
+       e = list_next(e)) {
+    f = list_entry(e, struct frame, ftable_elem);
+    if (f->frame_addr == frame_addr) {
+      break;
+    }
+    f = NULL;
+  }
+  if (f != NULL) {
+    f->page_addr = page_addr;
+    f->owner_thread = t;
+  } else {
+    struct frame *new_frame = malloc(sizeof (struct frame));
+    new_frame->page_addr = page_addr;
+    new_frame->frame_addr = frame_addr;
+    new_frame->owner_thread = t;
+    list_push_back(&frame_table, &new_frame->ftable_elem);
+  }
+
+  lock_release(&frame_lock);
 }
 
 void frame_update_upage(void* upage, void* kpage) {

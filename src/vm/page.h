@@ -37,11 +37,9 @@ struct page {
 //   size_t zero_bytes;       // size of remaining page (should be zeroed)
 
   struct hash_elem SPT_elem;  // hash elem for hash SPT
-  struct list_elem EVICT_elem;  // list elem for eviction queue
 };
 
 struct hash SPT;
-struct list eviction_queue;
 
 // enums for specifying page's purpose
 enum page_purpose { FOR_FILE = 0, FOR_STACK = 1, SWAPPED = 2 };
@@ -49,6 +47,9 @@ enum page_purpose { FOR_FILE = 0, FOR_STACK = 1, SWAPPED = 2 };
 // Initialize list object named frame_table. Call this in load()!
 void SPT_init(size_t user_frame_limit);
 
-struct page* get_victim();
+void SPT_insert(void *page_addr, void *frame_addr);
+void SPT_remove(void *page_addr);
+
+// struct page* get_victim();
 
 #endif /* vm/page.h */
