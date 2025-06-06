@@ -46,22 +46,6 @@ void SPT_destructor(struct hash_elem *e, void *aux) {
 
 void SPT_init() { hash_init(&thread_current()->SPT, SPT_hash, SPT_less, NULL); }
 
-void SPT_insert(struct file *f, off_t ofs, void *page_addr, void *frame_addr,
-                size_t read_bytes, size_t zero_bytes, bool writable,
-                enum page_purpose purpose) {
-  struct page *p;
-  p = malloc(sizeof(struct page));
-  p->page_file = f;
-  p->ofs = ofs;
-  p->page_addr = page_addr;
-  p->frame_addr = frame_addr;
-  p->read_bytes = read_bytes;
-  p->zero_bytes = zero_bytes;
-  p->is_writable = writable;
-  p->purpose = purpose;
-  if (hash_insert(&thread_current()->SPT, &p->SPT_elem) != NULL) free(p);
-}
-
 struct page *SPT_search(void *page_addr) {
   struct page temp;
   temp.page_addr = page_addr;
@@ -72,6 +56,22 @@ struct page *SPT_search(void *page_addr) {
   } else {
     return NULL;
   }
+}
+
+void SPT_insert(struct file *f, off_t ofs, void *page_addr, void *frame_addr,
+                size_t read_bytes, size_t zero_bytes, bool writable,
+                enum page_purpose purpose) {
+  if (SPT_search(page_addr) != NULL) return;
+  struct page *p;
+  p = malloc(sizeof(struct page));
+  p->page_file = f;
+  p->ofs = ofs;
+  p->page_addr = page_addr;
+  p->frame_addr = frame_addr;
+  p->read_bytes = read_bytes;
+  p->zero_bytes = zero_bytes;
+  p->is_writable = writable;
+  p->purpose = purpose;
 }
 
 void SPT_remove(void *page_addr) {

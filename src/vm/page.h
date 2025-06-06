@@ -48,14 +48,14 @@ struct page {
 // Initialize list object named frame_table. Call this in load()!
 void SPT_init();
 
+// Find page using page address as key.
+struct page *SPT_search(void *page_addr);
+
 // Insert new page "to-do list" into SPT.
 // Arguments are copied from load_segment() in process.c
 void SPT_insert(struct file *f, off_t ofs, void *page_addr, void *frame_addr,
                 size_t read_bytes, size_t zero_bytes, bool writable,
                 enum page_purpose purpose);
-
-// Find page using page address as key.
-struct page *SPT_search(void *page_addr);
 
 void SPT_remove(void *page_addr);
 

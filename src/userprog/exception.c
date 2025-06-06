@@ -4,11 +4,11 @@
 #include <stdio.h>
 
 #include "threads/interrupt.h"
-#include "threads/thread.h"
-#include "userprog/gdt.h"
-#include "threads/vaddr.h"
-#include "userprog/pagedir.h"
 #include "threads/palloc.h"
+#include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "userprog/gdt.h"
+#include "userprog/pagedir.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -147,26 +147,26 @@ static void page_fault(struct intr_frame* f) {
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-//   printf("Page fault at %p: %s error %s page in %s context.\n", fault_addr,
-//          not_present ? "not present" : "rights violation",
-//          write ? "writing" : "reading", user ? "user" : "kernel");
-// #ifdef USERPROG
-//   printf("%s: exit(%d)\n", thread_name(),
-//          thread_current()->exit_status);  // FIXME: pseudo-calling exit()
-// #endif
-//   kill(f);
-  #ifdef USERPROG
-  struct thread *cur = thread_current();
-  if(fault_addr == NULL || !is_user_vaddr(fault_addr))
-    exit(-1);
-  #endif
+  //   printf("Page fault at %p: %s error %s page in %s context.\n", fault_addr,
+  //          not_present ? "not present" : "rights violation",
+  //          write ? "writing" : "reading", user ? "user" : "kernel");
+  // #ifdef USERPROG
+  //   printf("%s: exit(%d)\n", thread_name(),
+  //          thread_current()->exit_status);  // FIXME: pseudo-calling exit()
+  // #endif
+  //   kill(f);
+#ifdef USERPROG
+  struct thread* cur = thread_current();
+  if (fault_addr == NULL || !is_user_vaddr(fault_addr)) exit(-1);
+#endif
 
   if (is_user_vaddr(fault_addr) && fault_addr >= f->esp - 32) {
-    void *kpage = palloc_get_page(PAL_USER | PAL_ZERO);
+    void* kpage = palloc_get_page(PAL_USER | PAL_ZERO);
     if (kpage == NULL) {
       kpage = frame_alloc();
     }
-    pagedir_set_page(thread_current()->pagedir, pg_round_down(fault_addr), kpage, true);
+    pagedir_set_page(thread_current()->pagedir, pg_round_down(fault_addr),
+                     kpage, true);
     return;
   }
   exit(-1);
