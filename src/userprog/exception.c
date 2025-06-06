@@ -197,7 +197,7 @@ static void page_fault(struct intr_frame* f) {
   else {
     switch (fault_page->purpose) {
       case FOR_FILE:
-        /*if (!fault_page->is_swapped) {
+        if (!fault_page->is_swapped) {
           // Reload load_segment's arguments
           struct file* file = fault_page->page_file;
           off_t ofs = fault_page->ofs;
@@ -225,7 +225,7 @@ static void page_fault(struct intr_frame* f) {
         } else {
           // FIXME: Page is in the swap disk.
           break;
-        }*/
+        }
         break;
 
       case FOR_STACK:

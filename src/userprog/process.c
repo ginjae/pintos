@@ -534,6 +534,7 @@ static bool load_segment(struct file* file, off_t ofs, uint8_t* upage,
        and zero the final PAGE_ZERO_BYTES bytes. */
     size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
     size_t page_zero_bytes = PGSIZE - page_read_bytes;
+    /*
 
     // Get a page of memory.
     uint8_t* kpage = frame_alloc(PAL_USER);
@@ -554,11 +555,14 @@ static bool load_segment(struct file* file, off_t ofs, uint8_t* upage,
       return false;
     }
 
+    */
+
     /* Insert page info to SPT. */
-    SPT_insert(file, ofs, upage, kpage, page_read_bytes, page_zero_bytes,
+    SPT_insert(file, ofs, upage, NULL, page_read_bytes, page_zero_bytes,
                writable, FOR_FILE);
 
     /* Advance. */
+    ofs += page_read_bytes;
     read_bytes -= page_read_bytes;
     zero_bytes -= page_zero_bytes;
     upage += PGSIZE;
