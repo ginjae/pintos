@@ -26,7 +26,7 @@ This "metadata" includes:
 */
 
 // enums for specifying page's purpose
-enum page_purpose { FOR_FILE = 0, FOR_STACK = 1, SWAPPED = 2 };
+enum page_purpose { FOR_FILE = 0, FOR_STACK = 1, FOR_MMAP = 2 };
 
 struct page {
   void *page_addr;   // upage
@@ -34,6 +34,7 @@ struct page {
 
   bool is_writable;  // is writing on this page allowed?
   size_t swap_i;     // index for backing store (swapped page end up there)
+  bool is_swapped;   // true if this page is in swap_disk, false otherwise.
   enum page_purpose purpose;  // Purpose for this page
 
   /* File-related members */

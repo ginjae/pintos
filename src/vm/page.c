@@ -62,6 +62,8 @@ void SPT_insert(struct file *f, off_t ofs, void *page_addr, void *frame_addr,
                 size_t read_bytes, size_t zero_bytes, bool writable,
                 enum page_purpose purpose) {
   if (SPT_search(page_addr) != NULL) return;
+  // printf("[SPT] Inserting upage %p, file: %p, purpose: %d\n", page_addr, f,
+  //        purpose);
   struct page *p;
   p = malloc(sizeof(struct page));
   p->page_file = f;
@@ -71,7 +73,9 @@ void SPT_insert(struct file *f, off_t ofs, void *page_addr, void *frame_addr,
   p->read_bytes = read_bytes;
   p->zero_bytes = zero_bytes;
   p->is_writable = writable;
+  p->is_swapped = false;
   p->purpose = purpose;
+  hash_insert(&thread_current()->SPT, &p->SPT_elem);
 }
 
 void SPT_remove(void *page_addr) {

@@ -3,6 +3,8 @@
 #include <inttypes.h>
 #include <stdio.h>
 
+#include "filesys/file.h"
+#include "filesys/off_t.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
 #include "threads/thread.h"
@@ -150,30 +152,36 @@ static void page_fault(struct intr_frame* f) {
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  //   printf("Page fault at %p: %s error %s page in %s context.\n", fault_addr,
-  //          not_present ? "not present" : "rights violation",
-  //          write ? "writing" : "reading", user ? "user" : "kernel");
-  // #ifdef USERPROG
-  //   printf("%s: exit(%d)\n", thread_name(),
-  //          thread_current()->exit_status);  // FIXME: pseudo-calling exit()
-  // #endif
-  //   kill(f);
+  // printf("Page fault at %p: %s error %s page in %s context.\n", fault_addr,
+  //        not_present ? "not present" : "rights violation",
+  //        write ? "writing" : "reading", user ? "user" : "kernel");
+  //  #ifdef USERPROG
+  //    printf("%s: exit(%d)\n", thread_name(),
+  //           thread_current()->exit_status);  // FIXME: pseudo-calling exit()
+  //  #endif
+  //    kill(f);
 
 #ifdef USERPROG
   // struct thread* cur = thread_current();
   // if (fault_addr == NULL || !is_user_vaddr(fault_addr)) exit(-1);
 #endif
+
   // Case 0. Bad access -> just raise error.
   if (fault_addr == NULL || !is_user_vaddr(fault_addr)) exit(-1);
+
+  // printf("Fault at %p, eip = %p, esp = %p\n", fault_addr, f->eip, f->esp);
 
   ASSERT(is_user_vaddr(fault_addr));
 
   void* fault_page_addr = pg_round_down(fault_addr);
+  // printf("Search for %p\n", fault_page_addr);
   struct page* fault_page = SPT_search(fault_page_addr);
 
   // Case 1. SPT does not exist
   //  -> page fault is caused by stack growth attempt.
   if (!fault_page) {
+    // printf("Search for %p failed. PHYS_BASE: %p\n", fault_page_addr,
+    // PHYS_BASE);
     if (fault_addr >= f->esp - 32) {
       void* kpage = frame_alloc(PAL_USER | PAL_ZERO);
       // if (kpage == NULL) kpage = frame_alloc(PAL_USER | PAL_ZERO);
@@ -189,7 +197,37 @@ static void page_fault(struct intr_frame* f) {
   else {
     switch (fault_page->purpose) {
       case FOR_FILE:
+        /*if (!fault_page->is_swapped) {
+          // Reload load_segment's arguments
+          struct file* file = fault_page->page_file;
+          off_t ofs = fault_page->ofs;
+          uint8_t* upage = fault_page->page_addr;
+          size_t page_read_bytes = fault_page->read_bytes;
+          size_t page_zero_bytes = fault_page->zero_bytes;
+          bool writable = fault_page->is_writable;
+
+          // Repeat load_segment
+          file_seek(file, ofs);
+          uint8_t* kpage = frame_alloc(PAL_USER);
+          if (kpage == NULL) exit(-1);
+          fault_page->frame_addr = kpage;
+
+          if (file_read(file, kpage, page_read_bytes) != (int)page_read_bytes) {
+            frame_free(kpage);
+            exit(-1);
+          }
+
+          memset(kpage + page_read_bytes, 0, page_zero_bytes);
+          pagedir_set_page(thread_current()->pagedir, upage, kpage, writable);
+
+          return;
+
+        } else {
+          // FIXME: Page is in the swap disk.
+          break;
+        }*/
         break;
+
       case FOR_STACK:
         break;
       default:
