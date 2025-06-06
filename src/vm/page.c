@@ -27,7 +27,7 @@ unsigned SPT_hash(const struct hash_elem *e, void *aux) {
 
   // hash_bytes conveniently returns appropriate hash with given size,
   // which is better than our previous hash function, pt_no.
-  return hash_bytes(p->page_addr, sizeof(p->page_addr));
+  return hash_bytes(&p->page_addr, sizeof(p->page_addr));
 }
 
 bool SPT_less(const struct hash_elem *a, const struct hash_elem *b, void *aux) {

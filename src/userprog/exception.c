@@ -9,6 +9,9 @@
 #include "threads/vaddr.h"
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
+#include "vm/frame.h"
+#include "vm/page.h"
+#include "vm/swap.h"  // will be needed for stack swap!
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -155,19 +158,44 @@ static void page_fault(struct intr_frame* f) {
   //          thread_current()->exit_status);  // FIXME: pseudo-calling exit()
   // #endif
   //   kill(f);
-#ifdef USERPROG
-  struct thread* cur = thread_current();
-  if (fault_addr == NULL || !is_user_vaddr(fault_addr)) exit(-1);
-#endif
 
-  if (is_user_vaddr(fault_addr) && fault_addr >= f->esp - 32) {
-    void* kpage = palloc_get_page(PAL_USER | PAL_ZERO);
-    if (kpage == NULL) {
-      kpage = frame_alloc();
+#ifdef USERPROG
+  // struct thread* cur = thread_current();
+  // if (fault_addr == NULL || !is_user_vaddr(fault_addr)) exit(-1);
+#endif
+  // Case 0. Bad access -> just raise error.
+  if (fault_addr == NULL || !is_user_vaddr(fault_addr)) exit(-1);
+
+  ASSERT(is_user_vaddr(fault_addr));
+
+  void* fault_page_addr = pg_round_down(fault_addr);
+  struct page* fault_page = SPT_search(fault_page_addr);
+
+  // Case 1. SPT does not exist
+  //  -> page fault is caused by stack growth attempt.
+  if (!fault_page) {
+    if (fault_addr >= f->esp - 32) {
+      void* kpage = frame_alloc(PAL_USER | PAL_ZERO);
+      // if (kpage == NULL) kpage = frame_alloc(PAL_USER | PAL_ZERO);
+      pagedir_set_page(thread_current()->pagedir, fault_page_addr, kpage, true);
+      SPT_insert(NULL, 0, fault_page_addr, kpage, 0, PGSIZE, true, FOR_STACK);
+      return;
+    } else {
+      exit(-1);
     }
-    pagedir_set_page(thread_current()->pagedir, pg_round_down(fault_addr),
-                     kpage, true);
-    return;
   }
+
+  // Case 2. SPT does exist
+  else {
+    switch (fault_page->purpose) {
+      case FOR_FILE:
+        break;
+      case FOR_STACK:
+        break;
+      default:
+        exit(-1);
+    }
+  }
+
   exit(-1);
 }
