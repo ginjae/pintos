@@ -24,7 +24,10 @@
 
 unsigned SPT_hash(const struct hash_elem *e, void *aux) {
   struct page *p = hash_entry(e, struct page, SPT_elem);
-  return pt_no(p->page_addr);
+
+  // hash_bytes conveniently returns appropriate hash with given size,
+  // which is better than our previous hash function, pt_no.
+  return hash_bytes(p->page_addr, sizeof(p->page_addr));
 }
 
 bool SPT_less(const struct hash_elem *a, const struct hash_elem *b, void *aux) {
@@ -57,6 +60,18 @@ void SPT_insert(struct file *f, off_t ofs, void *page_addr, void *frame_addr,
   p->is_writable = writable;
   p->purpose = purpose;
   if (hash_insert(&thread_current()->SPT, &p->SPT_elem) != NULL) free(p);
+}
+
+struct page *SPT_search(void *page_addr) {
+  struct page temp;
+  temp.page_addr = page_addr;
+  struct hash_elem *e = hash_find(&thread_current()->SPT, &temp.SPT_elem);
+  if (e != NULL) {
+    struct page *p = hash_entry(e, struct page, SPT_elem);
+    return p;
+  } else {
+    return NULL;
+  }
 }
 
 void SPT_remove(void *page_addr) {
