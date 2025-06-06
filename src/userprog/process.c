@@ -251,6 +251,9 @@ void process_exit(void) {
     process_wait(t->tid);
   }
 
+  // Destroy the current process's SPT.
+  SPT_destroy();
+
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -360,6 +363,9 @@ bool load(const char* file_name, void (**eip)(void), void** esp) {
   off_t file_ofs;
   bool success = false;
   int i;
+
+  /* Init SPT, which is per-process. */
+  SPT_init();
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create();
@@ -530,6 +536,7 @@ static bool load_segment(struct file* file, off_t ofs, uint8_t* upage,
     size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
     /* Get a page of memory. */
+
     uint8_t* kpage = frame_alloc(PAL_USER);
     // uint8_t* kpage = palloc_get_page(PAL_USER);
     // frame_add(upage, kpage);
@@ -548,6 +555,10 @@ static bool load_segment(struct file* file, off_t ofs, uint8_t* upage,
       return false;
     }
 
+    /* Insert page info to SPT. */
+    SPT_insert(file, ofs, upage, kpage, page_read_bytes, page_zero_bytes,
+               writable, FOR_FILE);
+
     /* Advance. */
     read_bytes -= page_read_bytes;
     zero_bytes -= page_zero_bytes;
@@ -565,12 +576,15 @@ static bool setup_stack(void** esp) {
   kpage = frame_alloc(PAL_USER | PAL_ZERO);
   // kpage = palloc_get_page(PAL_USER | PAL_ZERO);
   if (kpage != NULL) {
-    success = install_page(((uint8_t*)PHYS_BASE) - PGSIZE, kpage, true);
-    if (success)
+    void* upage = ((uint8_t*)PHYS_BASE) - PGSIZE;
+    success = install_page(upage, kpage, true);
+    if (success) {
       *esp = PHYS_BASE;
-    else
+      SPT_insert(NULL, 0, upage, kpage, 0, PGSIZE, true, FOR_STACK);
+    } else {
       // palloc_free_page(kpage);
       frame_free(kpage);
+    }
   }
   return success;
 }

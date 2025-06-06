@@ -2,6 +2,7 @@
 #define THREADS_THREAD_H
 
 #include <debug.h>
+#include <hash.h>
 #include <list.h>
 #include <stdint.h>
 
@@ -117,6 +118,8 @@ struct thread {
   bool load_status;        /* Loaded successfully or not */
   int exit_status;         /* Return value of calling exit */
   struct file* executable; /* Current running file */
+
+  struct hash SPT; /* PER-PROCESS SPT */
 #endif
 
   /* Owned by thread.c. */

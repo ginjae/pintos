@@ -1,10 +1,11 @@
 #ifndef PAGE_H
 #define PAGE_H
 
-#include <stddef.h>
 #include <hash.h>
 #include <list.h>
+#include <stddef.h>
 
+#include "filesys/off_t.h"
 #include "threads/palloc.h"
 
 /*
@@ -24,31 +25,38 @@ This "metadata" includes:
 
 */
 
+// enums for specifying page's purpose
+enum page_purpose { FOR_FILE = 0, FOR_STACK = 1, SWAPPED = 2 };
+
 struct page {
   void *page_addr;   // upage
   void *frame_addr;  // kpage
 
   bool is_writable;  // is writing on this page allowed?
-//   size_t swap_i;     // index for backing store (swapped page end up there)
-//   enum page_purpose purpose;  // Purpose for this page
+  size_t swap_i;     // index for backing store (swapped page end up there)
+  enum page_purpose purpose;  // Purpose for this page
 
-//   struct file *page_file;  // file for read (if purpose == FOR_FILE)
-//   size_t load_bytes;       // size of read
-//   size_t zero_bytes;       // size of remaining page (should be zeroed)
+  /* File-related members */
+  struct file *page_file;  // file for read (if purpose == FOR_FILE)
+  off_t ofs;               // file offset.
+  size_t read_bytes;       // size of read bytes.
+  size_t zero_bytes;       // size of remaining page (should be zeroed)
 
   struct hash_elem SPT_elem;  // hash elem for hash SPT
 };
 
-struct hash SPT;
-
-// enums for specifying page's purpose
-enum page_purpose { FOR_FILE = 0, FOR_STACK = 1, SWAPPED = 2 };
-
 // Initialize list object named frame_table. Call this in load()!
-void SPT_init(size_t user_frame_limit);
+void SPT_init();
 
-void SPT_insert(void *page_addr, void *frame_addr);
+// Insert new page "to-do list" into SPT.
+// Arguments are copied from load_segment() in process.c
+void SPT_insert(struct file *f, off_t ofs, void *page_addr, void *frame_addr,
+                size_t read_bytes, size_t zero_bytes, bool writable,
+                enum page_purpose purpose);
+
 void SPT_remove(void *page_addr);
+
+void SPT_destroy();
 
 // struct page* get_victim();
 

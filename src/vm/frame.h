@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "filesys/off_t.h"
 #include "threads/palloc.h"
 
 // 1. Define frame table & frame.

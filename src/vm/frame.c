@@ -24,6 +24,7 @@
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "vm/page.h"
+#include "vm/swap.h"
 
 // TODO
 
@@ -41,12 +42,15 @@ struct frame* find_frame(void* kpage) {
 
   struct list_elem* e;
   struct frame* f;
+  lock_acquire(&frame_lock);
 
   for (e = list_begin(&frame_table); e != list_end(&frame_table);
        e = list_next(e)) {
     f = list_entry(e, struct frame, ftable_elem);
     if (f->frame_addr == kpage) return f;
   }
+
+  lock_release(&frame_lock);
 
   // No such frame is found: return NULL.
   return NULL;
@@ -97,7 +101,7 @@ void* frame_alloc(enum palloc_flags flags) {
   // ii) assign palloc's result to member void* frame_addr
   uint8_t* kpage = palloc_get_page(flags);
   if (!kpage) {  // have to use page replacement algorithm
-    struct page* victim = find_victim();
+    struct frame* victim = find_victim();
     palloc_free_page(victim->page_addr);
     kpage = palloc_get_page(flags);
   }
@@ -120,9 +124,9 @@ void* frame_alloc(enum palloc_flags flags) {
   return kpage;
 }
 
-void frame_add(void *page_addr, void* frame_addr, struct thread* t) {
+void frame_add(void* page_addr, void* frame_addr, struct thread* t) {
   struct list_elem* e;
-  struct frame *f;
+  struct frame* f;
   lock_acquire(&frame_lock);
 
   for (e = list_begin(&frame_table); e != list_end(&frame_table);
@@ -137,7 +141,7 @@ void frame_add(void *page_addr, void* frame_addr, struct thread* t) {
     f->page_addr = page_addr;
     f->owner_thread = t;
   } else {
-    struct frame *new_frame = malloc(sizeof (struct frame));
+    struct frame* new_frame = malloc(sizeof(struct frame));
     new_frame->page_addr = page_addr;
     new_frame->frame_addr = frame_addr;
     new_frame->owner_thread = t;
