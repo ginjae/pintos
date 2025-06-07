@@ -60,7 +60,7 @@ struct frame* find_victim() {
 
   struct frame* f;
   uint32_t* pagedir;
-  size_t loop_lim = 4096;
+  size_t loop_lim = 10000;
   size_t counter = 0;
 
   lock_acquire(&frame_lock);
@@ -141,10 +141,9 @@ void* frame_alloc(enum palloc_flags flags) {
 
   // ii) assign palloc's result to member void* frame_addr
   uint8_t* kpage = palloc_get_page(flags);
-  while (!kpage) {
+  if (!kpage) {
     // have to use page replacement algorithm
     struct frame* victim = find_victim();
-    if (!victim) continue;
     swap_frame(victim);
     kpage = palloc_get_page(flags);
   }
