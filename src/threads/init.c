@@ -26,6 +26,7 @@
 #include "threads/thread.h"
 #include "vm/frame.h"
 #include "vm/page.h"
+#include "vm/swap.h"
 #ifdef USERPROG
 #include "userprog/exception.h"
 #include "userprog/gdt.h"
@@ -128,6 +129,7 @@ int main(void) {
   ide_init();
   locate_block_devices();
   filesys_init(format_filesys);
+  SD_init();
 #endif
 
   printf("Boot complete.\n");

@@ -78,11 +78,11 @@ struct frame* find_victim() {
       ft_cursor = list_next(ft_cursor);
       if (ft_cursor == list_end(&frame_table))
         ft_cursor = list_begin(&frame_table);
-      // list_remove(victim_cursor);
+      list_remove(victim_cursor);
       break;
     }
   }
-  // if (list_empty(&frame_table)) ft_cursor = NULL;
+  if (list_empty(&frame_table)) ft_cursor = NULL;
 
   lock_release(&frame_lock);
 
