@@ -212,7 +212,6 @@ static void syscall_handler(struct intr_frame* f) {
       tid_t pid;
       lock_acquire(&filesys_lock);
       pid = process_execute((const void*)*(uint32_t*)(f->esp + 4));
-      lock_release(&filesys_lock);
 
       // Search point to thread created, then wait for its loading
       // If the loading failed, return value should become -1
@@ -226,6 +225,8 @@ static void syscall_handler(struct intr_frame* f) {
           break;
         }
       }
+
+      lock_release(&filesys_lock);
       f->eax = pid;
       break;
 

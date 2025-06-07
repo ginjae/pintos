@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "filesys/file.h"
+#include "filesys/filesys.h"
 #include "filesys/off_t.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
@@ -202,21 +203,19 @@ static void page_fault(struct intr_frame* f) {
 
   // Case 2. SPT does exist
   else {
+    // Reload load_segment's arguments
+    struct file* file = fault_page->page_file;
+    off_t ofs = fault_page->ofs;
+    uint8_t* upage = fault_page->page_addr;
+    size_t page_read_bytes = fault_page->read_bytes;
+    size_t page_zero_bytes = fault_page->zero_bytes;
+    bool writable = fault_page->is_writable;
+    // If this fault is caused by write, but the page is not writable,
+    // raise error!
+    if (write && !writable) exit(-1);
     switch (fault_page->purpose) {
       case FOR_FILE:
         if (!fault_page->is_swapped) {
-          // Reload load_segment's arguments
-          struct file* file = fault_page->page_file;
-          off_t ofs = fault_page->ofs;
-          uint8_t* upage = fault_page->page_addr;
-          size_t page_read_bytes = fault_page->read_bytes;
-          size_t page_zero_bytes = fault_page->zero_bytes;
-          bool writable = fault_page->is_writable;
-
-          // If this fault is caused by write, but the page is not writable,
-          // raise error!
-          if (write && !writable) exit(-1);
-
           // Repeat load_segment
           file_seek(file, ofs);
           uint8_t* kpage = frame_alloc(PAL_USER);
@@ -234,11 +233,49 @@ static void page_fault(struct intr_frame* f) {
 
         } else {
           // FIXME: Page is in the swap disk.
-          break;
+          size_t swap_i = fault_page->swap_i;
+
+          // Repeat load_segment
+          file_seek(file, ofs);
+          uint8_t* kpage = frame_alloc(PAL_USER);
+          fault_page->frame_addr = kpage;
+
+          // Read from corresponding disk file.
+          SD_read(swap_i, kpage);
+          pagedir_set_page(thread_current()->pagedir, upage, kpage, writable);
+
+          return;
         }
         break;
 
       case FOR_STACK:
+        if (!fault_page->is_swapped) {
+          // This case should've covered by !fault_page check.
+          // I have no idea. Let's just pray.
+
+          // Allocate frame.
+          uint8_t* kpage = frame_alloc(PAL_USER | PAL_ZERO);
+          fault_page->frame_addr = kpage;
+
+          // Setup stack.
+          pagedir_set_page(thread_current()->pagedir, upage, kpage, writable);
+          thread_current()->esp = fault_addr;
+          return;
+
+        } else {
+          // Page is in the swap disk.
+          size_t swap_i = fault_page->swap_i;
+
+          // Allocate frame
+          uint8_t* kpage = frame_alloc(PAL_USER);
+          fault_page->frame_addr = kpage;
+
+          // Read from corresponding disk file.
+          SD_read(swap_i, kpage);
+          pagedir_set_page(thread_current()->pagedir, upage, kpage, writable);
+          thread_current()->esp = fault_addr;
+          return;
+        }
         break;
 
       case FOR_MMAP:
