@@ -166,6 +166,11 @@ void check_valid(void* addr) {
   }
 }
 
+void touch_addr(void* addr) {
+  uint8_t* addr_read = (void*)addr;
+  volatile uint8_t temp_read = *addr_read;
+}
+
 static void syscall_handler(struct intr_frame* f) {
   // printf("case: %d\n", *(uint32_t*)f->esp);
 
@@ -328,6 +333,8 @@ static void syscall_handler(struct intr_frame* f) {
       check_valid(f->esp + 8);
       check_valid(f->esp + 12);
 
+      touch_addr((const void*)*(uint32_t*)(f->esp + 8));
+
       if (!is_user_vaddr((void*)*(uint32_t*)(f->esp + 8)) ||
           !pagedir_get_page((uint32_t*)thread_current()->pagedir,
                             (const void*)*(uint32_t*)(f->esp + 8))) {
@@ -355,6 +362,8 @@ static void syscall_handler(struct intr_frame* f) {
       check_valid(f->esp + 4);
       check_valid(f->esp + 8);
       check_valid(f->esp + 12);
+
+      touch_addr((const void*)*(uint32_t*)(f->esp + 8));
 
       if (!is_user_vaddr((void*)*(uint32_t*)(f->esp + 8)) ||
           !pagedir_get_page((uint32_t*)thread_current()->pagedir,

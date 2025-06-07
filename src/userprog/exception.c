@@ -1,7 +1,10 @@
 #include "userprog/exception.h"
 
+#include <debug.h>
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "filesys/file.h"
 #include "filesys/off_t.h"
@@ -133,9 +136,6 @@ static void page_fault(struct intr_frame* f) {
      [IA32-v3a] 5.15 "Interrupt 14--Page Fault Exception
      (#PF)". */
   asm("movl %%cr2, %0" : "=r"(fault_addr));
-#ifdef USERPROG
-  thread_current()->exit_status = -1;
-#endif
 
   /* Turn interrupts back on (they were only off so that we could
      be assured of reading CR2 before it changed). */
@@ -184,7 +184,6 @@ static void page_fault(struct intr_frame* f) {
     // PHYS_BASE);
     if (fault_addr >= f->esp - 32) {
       void* kpage = frame_alloc(PAL_USER | PAL_ZERO);
-      // if (kpage == NULL) kpage = frame_alloc(PAL_USER | PAL_ZERO);
       pagedir_set_page(thread_current()->pagedir, fault_page_addr, kpage, true);
       SPT_insert(NULL, 0, fault_page_addr, kpage, 0, PGSIZE, true, FOR_STACK);
       return;
@@ -209,7 +208,6 @@ static void page_fault(struct intr_frame* f) {
           // Repeat load_segment
           file_seek(file, ofs);
           uint8_t* kpage = frame_alloc(PAL_USER);
-          if (kpage == NULL) exit(-1);
           fault_page->frame_addr = kpage;
 
           if (file_read(file, kpage, page_read_bytes) != (int)page_read_bytes) {
