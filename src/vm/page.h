@@ -33,7 +33,7 @@ struct page {
   void *frame_addr;  // kpage
 
   bool is_writable;  // is writing on this page allowed?
-  size_t swap_i;     // index for backing store (swapped page end up there)
+  size_t swap_i;     // index for swap disk (swapped page end up there)
   bool is_swapped;   // true if this page is in swap_disk, false otherwise.
   enum page_purpose purpose;  // Purpose for this page
 

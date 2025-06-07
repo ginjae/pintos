@@ -15,6 +15,8 @@
 #include <string.h>
 
 #include "devices/timer.h"
+#include "filesys/file.h"
+#include "filesys/filesys.h"
 #include "threads/loader.h"
 #include "threads/malloc.h"
 #include "threads/palloc.h"
@@ -89,15 +91,61 @@ struct frame* find_victim() {
   return f;
 }
 
+void swap_frame(struct frame* victim) {
+  // Assume that the victim is removed from the frame table.
+  void* page_addr = victim->page_addr;
+  void* frame_addr = victim->frame_addr;
+  struct page* page = SPT_search(page_addr);
+  if (!page) {
+    palloc_free_page(frame_addr);
+    return;
+  }
+
+  enum page_purpose pur = page->purpose;
+  size_t idx = page->swap_i;
+  struct thread* owner = victim->owner_thread;
+
+  switch (pur) {
+    case FOR_FILE:
+      if (pagedir_is_dirty(owner->pagedir, page_addr)) {
+        page->swap_i = SD_write(idx, frame_addr);
+        pagedir_set_dirty(owner->pagedir, page_addr, false);
+      }
+      page->is_swapped = true;
+      break;
+
+    case FOR_STACK:
+      page->swap_i = SD_write(idx, frame_addr);
+      page->is_swapped = true;
+      break;
+
+    case FOR_MMAP:
+      if (pagedir_is_dirty(owner->pagedir, page_addr)) {
+        file_write_at(page->page_file, frame_addr, PGSIZE, page->ofs);
+        pagedir_set_dirty(owner->pagedir, page_addr, false);
+      }
+      page->is_swapped = false;
+      break;
+  }
+
+  page->frame_addr = NULL;
+
+  pagedir_clear_page(owner->pagedir, page_addr);
+  palloc_free_page(frame_addr);
+  free(victim);
+}
+
 void* frame_alloc(enum palloc_flags flags) {
   // i) create new struct frame
   struct frame* new_frame = malloc(sizeof(struct frame));
 
   // ii) assign palloc's result to member void* frame_addr
   uint8_t* kpage = palloc_get_page(flags);
-  if (!kpage) {  // have to use page replacement algorithm
+  while (!kpage) {
+    // have to use page replacement algorithm
     struct frame* victim = find_victim();
-    palloc_free_page(victim->page_addr);
+    if (!victim) continue;
+    swap_frame(victim);
     kpage = palloc_get_page(flags);
   }
   new_frame->frame_addr = kpage;

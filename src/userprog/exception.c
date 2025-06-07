@@ -240,6 +240,10 @@ static void page_fault(struct intr_frame* f) {
 
       case FOR_STACK:
         break;
+
+      case FOR_MMAP:
+        break;
+
       default:
         exit(-1);
     }

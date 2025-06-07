@@ -22,7 +22,7 @@
 /* Default implementation for frame. (without swap or evict, etc.) */
 struct frame {
   void* frame_addr;              // allocated frame's address. (=kpage)
-  void* page_addr;               // virtual address pointing to frame. (=upage)
+  void* page_addr;               // virtual address pointing to page. (=upage)
   struct thread* owner_thread;   // Process(thread) who owns this frame
   struct list_elem ftable_elem;  // list element for frame table list
   // int64_t access_time;        // redundant for second chance
@@ -45,6 +45,10 @@ struct frame* find_frame(void* kpage);
 
 // Returns victim frame via second chance algorithm.
 struct frame* find_victim();
+
+// Swap the frame's content with the swap disk
+// & update corresponding SPT's swap_i value.
+void swap_frame(struct frame* victim);
 
 // Allocate frame & update frame table.
 void* frame_alloc(enum palloc_flags);

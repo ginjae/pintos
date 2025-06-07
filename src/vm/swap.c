@@ -1,5 +1,6 @@
 #include "vm/swap.h"
 
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -38,17 +39,21 @@ void SD_read(size_t idx, void *page) {
   bitmap_set_multiple(disk_map, idx, SEC_PER_PAGE, FREE);
   size_t i;
   for (i = idx; i < idx + SEC_PER_PAGE; i++) {
-    block_read(swap_disk, i, page + BLOCK_SECTOR_SIZE);
+    block_read(swap_disk, i, page + BLOCK_SECTOR_SIZE * (i - idx));
   }
 }
 
-size_t SD_write(void *page) {
-  size_t idx = bitmap_scan_and_flip(disk_map, 0, SEC_PER_PAGE, FILLED);
-  if (idx != 0) {
-    size_t i;
-    for (i = idx; i < idx + SEC_PER_PAGE; i++) {
-      block_write(swap_disk, i, page + BLOCK_SECTOR_SIZE);
-    }
+size_t SD_write(size_t idx_, void *page) {
+  size_t idx = idx_;
+  if (idx == 0) {
+    idx = bitmap_scan_and_flip(disk_map, 0, SEC_PER_PAGE, FREE);
+    if (idx == BITMAP_ERROR) return 0;
+  } else
+    bitmap_set_multiple(disk_map, idx, SEC_PER_PAGE, FILLED);
+
+  size_t i;
+  for (i = idx; i < idx + SEC_PER_PAGE; i++) {
+    block_write(swap_disk, i, page + BLOCK_SECTOR_SIZE * (i - idx));
   }
   return idx;
 }
