@@ -166,9 +166,11 @@ void check_valid(void* addr) {
   }
 }
 
+/* Cause page fault by "touching". This forces lazy-load to actually load
+ * something in that page.*/
 void touch_addr(void* addr) {
-  uint8_t* addr_read = (void*)addr;
-  volatile uint8_t temp_read = *addr_read;
+  uint8_t* temp_addr = (void*)addr;
+  volatile uint8_t touch = *temp_addr;
 }
 
 static void syscall_handler(struct intr_frame* f) {

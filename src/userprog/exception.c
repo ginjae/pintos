@@ -205,6 +205,10 @@ static void page_fault(struct intr_frame* f) {
           size_t page_zero_bytes = fault_page->zero_bytes;
           bool writable = fault_page->is_writable;
 
+          // If this fault is caused by write, but the page is not writable,
+          // raise error!
+          if (write && !writable) exit(-1);
+
           // Repeat load_segment
           file_seek(file, ofs);
           uint8_t* kpage = frame_alloc(PAL_USER);
