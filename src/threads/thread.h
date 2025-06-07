@@ -120,6 +120,8 @@ struct thread {
   struct file* executable; /* Current running file */
 
   struct hash SPT; /* PER-PROCESS SPT */
+  void* esp;       /* stack pointer of this process.*/
+
 #endif
 
   /* Owned by thread.c. */

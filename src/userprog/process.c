@@ -168,7 +168,10 @@ static void start_process(void* file_name_) {
   success = load(argv[0], &if_.eip, &if_.esp);
   sema_up(&(thread_current()->load_sema));
 
-  if (success) push_argv(argc, argv, &if_.esp);
+  if (success) {
+    push_argv(argc, argv, &if_.esp);
+    thread_current()->esp = if_.esp;
+  }
 
   /* If load failed, quit. */
   palloc_free_page(file_name_);

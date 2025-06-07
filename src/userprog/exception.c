@@ -161,10 +161,16 @@ static void page_fault(struct intr_frame* f) {
   //  #endif
   //    kill(f);
 
-#ifdef USERPROG
-  // struct thread* cur = thread_current();
-  // if (fault_addr == NULL || !is_user_vaddr(fault_addr)) exit(-1);
-#endif
+  // #ifdef USERPROG
+  //  struct thread* cur = thread_current();
+  //  if (fault_addr == NULL || !is_user_vaddr(fault_addr)) exit(-1);
+  // #endif
+
+  void* esp;
+  if (user)
+    esp = f->esp;
+  else
+    esp = thread_current()->esp;
 
   // Case 0. Bad access -> just raise error.
   if (fault_addr == NULL || !is_user_vaddr(fault_addr)) exit(-1);
@@ -180,12 +186,14 @@ static void page_fault(struct intr_frame* f) {
   // Case 1. SPT does not exist
   //  -> page fault is caused by stack growth attempt.
   if (!fault_page) {
-    // printf("Search for %p failed. PHYS_BASE: %p\n", fault_page_addr,
-    // PHYS_BASE);
-    if (fault_addr >= f->esp - 32) {
+    // 8MB stack size limit.
+    if (fault_addr <= PHYS_BASE - 0x800000) exit(-1);
+
+    if (fault_addr >= esp - 32) {
       void* kpage = frame_alloc(PAL_USER | PAL_ZERO);
       pagedir_set_page(thread_current()->pagedir, fault_page_addr, kpage, true);
       SPT_insert(NULL, 0, fault_page_addr, kpage, 0, PGSIZE, true, FOR_STACK);
+      thread_current()->esp = fault_addr;
       return;
     } else {
       exit(-1);

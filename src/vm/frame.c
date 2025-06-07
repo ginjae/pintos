@@ -26,11 +26,6 @@
 #include "vm/page.h"
 #include "vm/swap.h"
 
-// TODO
-
-// 2. Define frame table allocator.
-//    to replace palloc_get_page(PAL_USER) in process.c
-
 void frame_table_init(size_t user_frame_limit) {
   list_init(&frame_table);  // initialize list frame_table.
   lock_init(&frame_lock);   // initialize frame lock.
