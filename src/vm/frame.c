@@ -118,7 +118,8 @@ void swap_frame(struct frame* victim) {
 
   switch (pur) {
     case FOR_FILE:
-      if (pagedir_is_dirty(owner->pagedir, page_addr)) {
+      if (pagedir_is_dirty(owner->pagedir, page_addr) || 
+          pagedir_is_dirty(owner->pagedir, frame_addr)) {
         // printf("swap_i before write: %zu\n", page->swap_i);
         uint8_t* bytes = frame_addr;
         page->swap_i = SD_write(frame_addr);
