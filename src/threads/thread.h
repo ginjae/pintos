@@ -123,7 +123,6 @@ struct thread {
   void* esp;       /* stack pointer of this process.*/
 
   struct list mmap_table;  /* List of mappings (mmap table) */
-
 #endif
 
 

@@ -16,6 +16,7 @@
 #include "userprog/process.h"
 #include "vm/mmap.h"
 #include "vm/page.h"
+#include "vm/frame.h"
 
 static void syscall_handler(struct intr_frame*);
 
@@ -197,6 +198,8 @@ int mmap(int fd, void* addr) {
   // The range of pages mapped overlaps any exisitng set of mapped pages -> fail
   if (find_mapping_addr(&t->mmap_table, addr) != NULL)
     return -1;
+  if (addr >= PHYS_BASE - PGSIZE)
+    return -1;
 
   // Insert mapping to mmap_table
   struct mapping* m = malloc(sizeof (struct mapping));
@@ -240,7 +243,7 @@ int mmap(int fd, void* addr) {
 void munmap(int mapping) {
   struct thread* t = thread_current();
   struct mapping* m = find_mapping_id(&t->mmap_table, mapping);
-  if(m == NULL)
+  if (m == NULL)
     exit(-1);
 
   // Check whether the pages are dirty. If so, call `file_write_at`
@@ -254,7 +257,7 @@ void munmap(int mapping) {
     struct page *p = hash_entry(hash_cur(&it), struct page, SPT_elem);
     if (p->purpose != FOR_MMAP)
       continue;
-    void *addr = p->page_addr;
+    void* addr = p->page_addr;
     if (pagedir_is_dirty(t->pagedir, addr))
       file_write_at(p->page_file, p->page_addr, p->read_bytes, p->ofs);
   }
@@ -264,7 +267,20 @@ void munmap(int mapping) {
   file_close(m->file);
 
   // free mapping with unmapping page, clearing spt, free frame entry, ...
-  // do something
+  hash_first(&it, spt);
+  while (hash_next(&it)) {
+    struct page *p = hash_entry(hash_cur(&it), struct page, SPT_elem);
+    if (p->purpose != FOR_MMAP)
+      continue;
+    void* addr = p->page_addr;
+    void* frame_addr = p->frame_addr;
+    frame_free(addr);
+    pagedir_clear_page(t->pagedir, addr);
+    palloc_free_page(frame_addr);
+  }
+
+  hash_delete(&t->SPT, &m->elem);
+  free(m);
 }
 
 

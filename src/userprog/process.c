@@ -21,8 +21,10 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "vm/frame.h"
 #include "vm/page.h"
+#include "vm/mmap.h"
 
 static thread_func start_process NO_RETURN;
 static bool load(const char* cmdline, void (**eip)(void), void** esp);
@@ -224,12 +226,20 @@ int process_wait(tid_t child_tid) {
 /* Free the current process's resources. */
 void process_exit(void) {
   struct thread* cur = thread_current();
+  struct list_elem* e;
+
   uint32_t* pd;
 
   // release lock & remove childelem before destroying pd
   sema_up(&(cur->child_sema));
   sema_down(&(cur->exit_sema));
   list_remove(&(cur->childelem));
+
+  // Destroy all mappings
+  for (e = list_begin(&cur->mmap_table); e != list_end(&cur->mmap_table); e = list_next(e)) {
+    struct mapping *m = list_entry(e, struct mapping, elem);
+    munmap(m->id);
+  }
 
   // Close files that process opened
   int i;
@@ -246,16 +256,15 @@ void process_exit(void) {
     cur->executable = NULL;
   }
 
+  // Destroy the current process's SPT.
+  SPT_destroy();
+
   // Call wait for all children
-  struct list_elem* e;
   for (e = list_begin(&(thread_current()->children));
        e != list_end(&(thread_current()->children)); e = list_next(e)) {
     struct thread* t = list_entry(e, struct thread, childelem);
     process_wait(t->tid);
   }
-
-  // Destroy the current process's SPT.
-  SPT_destroy();
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
