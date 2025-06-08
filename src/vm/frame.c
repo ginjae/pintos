@@ -39,7 +39,7 @@ struct frame* find_frame(void* kpage) {
 
   struct list_elem* e;
   struct frame* f;
-  lock_acquire(&frame_lock);
+  // lock_acquire(&frame_lock);
 
   for (e = list_begin(&frame_table); e != list_end(&frame_table);
        e = list_next(e)) {
@@ -47,7 +47,7 @@ struct frame* find_frame(void* kpage) {
     if (f->frame_addr == kpage) return f;
   }
 
-  lock_release(&frame_lock);
+  // lock_release(&frame_lock);
 
   // No such frame is found: return NULL.
   return NULL;
@@ -63,28 +63,30 @@ struct frame* find_victim() {
   size_t loop_lim = 10000;
   size_t counter = 0;
 
+  struct list_elem* victim_cursor = NULL;
+
   lock_acquire(&frame_lock);
 
   while (counter < loop_lim) {
     f = list_entry(ft_cursor, struct frame, ftable_elem);
     pagedir = f->owner_thread->pagedir;
 
-    if (pagedir_is_accessed(pagedir, f->page_addr)) {
-      pagedir_set_accessed(pagedir, f->page_addr, false);
+    if (!f->is_evictable || pagedir_is_accessed(pagedir, f->page_addr)) {
       ft_cursor = list_next(ft_cursor);
       if (ft_cursor == list_end(&frame_table))
         ft_cursor = list_begin(&frame_table);
+      if (f->is_evictable) pagedir_set_accessed(pagedir, f->page_addr, false);
       counter++;
     } else {
-      struct list_elem* victim_cursor = ft_cursor;
+      void* page_addr = f->page_addr;
+      victim_cursor = ft_cursor;
       ft_cursor = list_next(ft_cursor);
       if (ft_cursor == list_end(&frame_table))
         ft_cursor = list_begin(&frame_table);
-      list_remove(victim_cursor);
+      f = list_entry(victim_cursor, struct frame, ftable_elem);
       break;
     }
   }
-  if (list_empty(&frame_table)) ft_cursor = NULL;
 
   lock_release(&frame_lock);
 
@@ -98,8 +100,10 @@ void swap_frame(struct frame* victim) {
   struct page* page = SPT_search(page_addr);
   if (!page) {
     palloc_free_page(frame_addr);
+    victim->frame_addr = NULL;
     return;
   }
+  victim->is_evictable = false;
 
   enum page_purpose pur = page->purpose;
   size_t idx = page->swap_i;
@@ -138,15 +142,23 @@ void swap_frame(struct frame* victim) {
 void* frame_alloc(enum palloc_flags flags) {
   // i) create new struct frame
   struct frame* new_frame = malloc(sizeof(struct frame));
+  struct frame* victim = NULL;
+
+  new_frame->is_evictable = false;
 
   // ii) assign palloc's result to member void* frame_addr
   uint8_t* kpage = palloc_get_page(flags);
-  if (!kpage) {
+  while (!kpage) {
     // have to use page replacement algorithm
-    struct frame* victim = find_victim();
+    victim = find_victim();
+    lock_acquire(&frame_lock);
+    list_remove(&(victim->ftable_elem));
+    lock_release(&frame_lock);
     swap_frame(victim);
     kpage = palloc_get_page(flags);
+    new_frame->is_evictable = true;
   }
+
   new_frame->frame_addr = kpage;
 
   // iii) assign current thread to member owner_thread
@@ -157,10 +169,10 @@ void* frame_alloc(enum palloc_flags flags) {
 
   // v) push struct into static struct list frame_table.
   //    since this is the critical section, use lock!
-  lock_acquire(&frame_lock);
+  // lock_acquire(&frame_lock);
   list_push_back(&frame_table, &new_frame->ftable_elem);
   if (!ft_cursor) ft_cursor = list_begin(&frame_table);
-  lock_release(&frame_lock);
+  // lock_release(&frame_lock);
 
   // vi) return kernel virtual address (physical address)
   return kpage;
@@ -203,12 +215,12 @@ void frame_update_upage(void* upage, void* kpage) {
 }
 
 void frame_free(void* kpage) {
+  if (!kpage) return;
   struct list_elem* e;
   struct frame* f;
 
-  lock_acquire(&frame_lock);
+  // lock_acquire(&frame_lock);
 
-  // Note: list_empty is critical section, so it requires lock.
   if (list_empty(&frame_table)) {
     lock_release(&frame_lock);
     return;
@@ -230,5 +242,5 @@ void frame_free(void* kpage) {
       break;
     }
   }
-  lock_release(&frame_lock);
+  // lock_release(&frame_lock);
 }

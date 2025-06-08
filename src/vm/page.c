@@ -21,6 +21,8 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/pagedir.h"
+#include "vm/frame.h"
 
 unsigned SPT_hash(const struct hash_elem *e, void *aux) {
   struct page *p = hash_entry(e, struct page, SPT_elem);
@@ -40,6 +42,10 @@ bool SPT_less(const struct hash_elem *a, const struct hash_elem *b, void *aux) {
 void SPT_destructor(struct hash_elem *e, void *aux) {
   if (e != NULL) {
     struct page *p = hash_entry(e, struct page, SPT_elem);
+    if (p->frame_addr != NULL && !p->is_swapped) {
+      pagedir_clear_page(thread_current()->pagedir, p->page_addr);
+      if (find_frame(p->frame_addr)) frame_free(p->frame_addr);
+    }
     free(p);
   }
 }
@@ -75,6 +81,11 @@ void SPT_insert(struct file *f, off_t ofs, void *page_addr, void *frame_addr,
   p->is_writable = writable;
   p->is_swapped = false;
   p->purpose = purpose;
+
+  struct frame *frame = find_frame(frame_addr);
+  if (frame) {
+    frame->is_evictable = true;
+  }
   hash_insert(&thread_current()->SPT, &p->SPT_elem);
 }
 

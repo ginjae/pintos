@@ -25,7 +25,7 @@ struct frame {
   void* page_addr;               // virtual address pointing to page. (=upage)
   struct thread* owner_thread;   // Process(thread) who owns this frame
   struct list_elem ftable_elem;  // list element for frame table list
-  // int64_t access_time;        // redundant for second chance
+  bool is_evictable;             // true iff the corresponding SPT exists.
 };
 
 /* Frame table that keeps track of all available frames. */

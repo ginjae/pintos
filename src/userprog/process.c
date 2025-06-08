@@ -578,16 +578,16 @@ static bool load_segment(struct file* file, off_t ofs, uint8_t* upage,
 static bool setup_stack(void** esp) {
   // printf("[DEBUG] esp = %p, PHYS_BASE = %p\n", esp, PHYS_BASE);
   uint8_t* kpage;
+  void* upage = ((uint8_t*)PHYS_BASE) - PGSIZE;
   bool success = false;
-
+  SPT_insert(NULL, 0, upage, kpage, 0, PGSIZE, true, FOR_STACK);
   kpage = frame_alloc(PAL_USER | PAL_ZERO);
   // kpage = palloc_get_page(PAL_USER | PAL_ZERO);
   if (kpage != NULL) {
-    void* upage = ((uint8_t*)PHYS_BASE) - PGSIZE;
     success = install_page(upage, kpage, true);
     if (success) {
       *esp = PHYS_BASE;
-      SPT_insert(NULL, 0, upage, kpage, 0, PGSIZE, true, FOR_STACK);
+
     } else {
       // palloc_free_page(kpage);
       frame_free(kpage);
