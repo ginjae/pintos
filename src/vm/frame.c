@@ -97,17 +97,20 @@ void swap_frame(struct frame* victim) {
   // Assume that the victim is removed from the frame table.
   void* page_addr = victim->page_addr;
   void* frame_addr = victim->frame_addr;
-  struct page* page = SPT_search(page_addr);
+  struct thread* owner = victim->owner_thread;
+  struct page* page = SPT_search(owner, page_addr);
   if (!page) {
+    printf("Evicting page %p owned by %s\n", page_addr, owner->name);
+    if (victim->is_evictable) printf("NOOOOO\n");
     palloc_free_page(frame_addr);
-    victim->frame_addr = NULL;
+    free(victim);
     return;
   }
-  victim->is_evictable = false;
+
+  // printf("swap_i: %zu\n", page->swap_i);
 
   enum page_purpose pur = page->purpose;
   size_t idx = page->swap_i;
-  struct thread* owner = victim->owner_thread;
 
   switch (pur) {
     case FOR_FILE:
@@ -133,10 +136,8 @@ void swap_frame(struct frame* victim) {
   }
 
   page->frame_addr = NULL;
-
   pagedir_clear_page(owner->pagedir, page_addr);
   palloc_free_page(frame_addr);
-  free(victim);
 }
 
 void* frame_alloc(enum palloc_flags flags) {

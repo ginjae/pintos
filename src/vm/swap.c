@@ -47,7 +47,6 @@ size_t SD_write(size_t idx_, void *page) {
   size_t idx = idx_;
   if (idx == 0) {
     idx = bitmap_scan_and_flip(disk_map, 0, SEC_PER_PAGE, FREE);
-    if (idx == BITMAP_ERROR) return 0;
   } else
     bitmap_set_multiple(disk_map, idx, SEC_PER_PAGE, FILLED);
 

@@ -7,6 +7,7 @@
 
 #include "filesys/off_t.h"
 #include "threads/palloc.h"
+#include "threads/thread.h"
 
 /*
 
@@ -50,7 +51,7 @@ struct page {
 void SPT_init();
 
 // Find page using page address as key.
-struct page *SPT_search(void *page_addr);
+struct page *SPT_search(struct thread *owner, void *page_addr);
 
 // Insert new page "to-do list" into SPT.
 // Arguments are copied from load_segment() in process.c

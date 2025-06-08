@@ -182,7 +182,7 @@ static void page_fault(struct intr_frame* f) {
 
   void* fault_page_addr = pg_round_down(fault_addr);
   // printf("Search for %p\n", fault_page_addr);
-  struct page* fault_page = SPT_search(fault_page_addr);
+  struct page* fault_page = SPT_search(thread_current(), fault_page_addr);
 
   // Case 1. SPT does not exist
   //  -> page fault is caused by stack growth attempt.
@@ -221,31 +221,47 @@ static void page_fault(struct intr_frame* f) {
           uint8_t* kpage = frame_alloc(PAL_USER);
           fault_page->frame_addr = kpage;
 
-          if (file_read(file, kpage, page_read_bytes) != (int)page_read_bytes) {
+          struct frame* new_frame = find_frame(kpage);
+          new_frame->page_addr = upage;
+          new_frame->is_evictable = true;
+
+          off_t n = file_read(file, kpage, page_read_bytes);
+          if (n != (int)page_read_bytes) {
             frame_free(kpage);
             exit(-1);
           }
 
           memset(kpage + page_read_bytes, 0, page_zero_bytes);
-          pagedir_set_page(thread_current()->pagedir, upage, kpage, writable);
+          bool ok = pagedir_set_page(thread_current()->pagedir, upage, kpage,
+                                     writable);
+          if (!ok) {
+            printf("Failed!: pagedir_set_page in thread: %s\n", thread_name());
+          }
 
           return;
 
         } else {
           // FIXME: Page is in the swap disk.
           size_t swap_i = fault_page->swap_i;
+          // if (swap_i == 0) printf("swap index is 0!!!!\n");
 
           // Repeat load_segment
           file_seek(file, ofs);
           uint8_t* kpage = frame_alloc(PAL_USER);
+          // if (!kpage) printf("Your frame_alloc is trash\n");
           fault_page->frame_addr = kpage;
 
           // Read from corresponding disk file.
           SD_read(swap_i, kpage);
-          pagedir_set_page(thread_current()->pagedir, upage, kpage, writable);
-
+          memset(kpage + page_read_bytes, 0, page_zero_bytes);
+          bool ok = pagedir_set_page(thread_current()->pagedir, upage, kpage,
+                                     writable);
+          if (!ok) {
+            printf("Failed!: pagedir_set_page in thread: %s\n", thread_name());
+          }
           return;
         }
+
         break;
 
       case FOR_STACK:
