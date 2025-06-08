@@ -71,8 +71,6 @@ void SPT_insert(struct file *f, off_t ofs, void *page_addr, void *frame_addr,
     printf("EXIST NO!!!!\n");
     return;
   }
-  // printf("SPT insert: page %p into thread %s\n", page_addr,
-  //        thread_current()->name);
   struct page *p;
   p = malloc(sizeof(struct page));
   p->page_file = f;
@@ -84,11 +82,11 @@ void SPT_insert(struct file *f, off_t ofs, void *page_addr, void *frame_addr,
   p->is_writable = writable;
   p->is_swapped = false;
   p->purpose = purpose;
-  p->swap_i = 0;
+  p->swap_i = BITMAP_ERROR;
 
   struct frame *frame = find_frame(frame_addr);
   if (frame) {
-    frame->page_addr = page_addr;  // I forgot this...
+    frame->page_addr = page_addr;
     frame->is_evictable = true;
   }
   hash_insert(&thread_current()->SPT, &p->SPT_elem);

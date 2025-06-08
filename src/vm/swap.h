@@ -11,6 +11,6 @@ void SD_read(size_t idx, void* page);
 
 // Write PGSIZE bytes of data from the page to the swap_disk,
 // with corresponding index.
-size_t SD_write(size_t idx_, void* page);
+size_t SD_write(void* page);
 
 #endif /* vm/swap.h */

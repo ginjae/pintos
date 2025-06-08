@@ -581,7 +581,7 @@ static bool setup_stack(void** esp) {
   void* upage = ((uint8_t*)PHYS_BASE) - PGSIZE;
   bool success = false;
 
-  kpage = frame_alloc(PAL_USER | PAL_ZERO);
+  kpage = frame_alloc(PAL_USER | PAL_ZERO, false);
   // kpage = palloc_get_page(PAL_USER | PAL_ZERO);
   if (kpage != NULL) {
     success = install_page(upage, kpage, true);
