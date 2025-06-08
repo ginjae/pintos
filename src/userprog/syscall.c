@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <syscall-nr.h>
+#include <hash.h>
 
 #include "devices/shutdown.h"
 #include "filesys/file.h"
@@ -183,8 +184,8 @@ int mmap(int fd, void* addr) {
   // Validation
   if (fd == 0 || fd == 1 || addr == NULL)
     return -1;
-  // if (pg_ofs(addr))
-  //   return -1;
+  if (pg_ofs(addr) != 0) 
+    return -1;
   struct thread* t = thread_current();
   struct file** fd_table = t->fd_table;
   struct file* f = fd_table[fd];
@@ -194,8 +195,8 @@ int mmap(int fd, void* addr) {
   if (len == 0)
     return -1;
   // The range of pages mapped overlaps any exisitng set of mapped pages -> fail
-  // if ()
-
+  if (find_mapping_addr(&t->mmap_table, addr) != NULL)
+    return -1;
 
   // Insert mapping to mmap_table
   struct mapping* m = malloc(sizeof (struct mapping));
@@ -237,16 +238,16 @@ int mmap(int fd, void* addr) {
 
 /* Unmap the mapping */
 void munmap(int mapping) {
-  struct thread* t = thread_current();
-  struct mapping* m = find_mapping_id(&t->mmap_table, mapping);
-  if(m == NULL)
-    exit(-1);
+  // struct thread* t = thread_current();
+  // struct mapping* m = find_mapping_id(&t->mmap_table, mapping);
+  // if(m == NULL)
+  //   exit(-1);
 
   // Check whether the pages are dirty. If so, call `file_write_at`
   // do something
 
   // Close reopened file
-  file_close(m->file);
+  // file_close(m->file);
   // free mapping with unmapping page, clearing spt, free frame entry, ...
   // do something
 }
@@ -501,7 +502,7 @@ static void syscall_handler(struct intr_frame* f) {
       check_valid(f->esp + 4);
       check_valid(f->esp + 8);
 
-      mmap((int)*(uint32_t*)(f->esp + 4), (void*)*(uint32_t*)(f->esp + 8));
+      f->eax = mmap((int)*(uint32_t*)(f->esp + 4), (void*)*(uint32_t*)(f->esp + 8));
 
       break;
 
