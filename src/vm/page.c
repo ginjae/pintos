@@ -105,13 +105,3 @@ void SPT_remove(void *page_addr) {
 }
 
 void SPT_destroy() { hash_destroy(&thread_current()->SPT, SPT_destructor); }
-
-/*
-// Selects victim using the page replacement algorithm
-// called the second chance algorithm
-struct page* get_victim() {
-  // accessed bit of pte :  PTE_A
-  // dirty bit of pte :     PTE_D
-
-}
-*/

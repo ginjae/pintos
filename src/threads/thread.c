@@ -506,6 +506,8 @@ static void init_thread(struct thread* t, const char* name, int priority) {
   t->wait_status = false;
   t->load_status = true;
   t->executable = NULL;
+
+  list_init(&(t->mmap_table));
 #endif
 }
 

@@ -7,12 +7,14 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "threads/interrupt.h"
+#include "threads/palloc.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "userprog/process.h"
 #include "vm/mmap.h"
+#include "vm/page.h"
 
 static void syscall_handler(struct intr_frame*);
 
@@ -177,8 +179,10 @@ void touch_addr(void* addr) {
 /* Map files into process address space */
 int mmap(int fd, void* addr) {
   // Validation
-  if (fd == 0 || fd == 1 || addr == NULL || pg_ofs(addr) != 0)
+  if (fd == 0 || fd == 1 || addr == NULL)
     return -1;
+  // if (pg_ofs(addr))
+  //   return -1;
   struct thread* t = thread_current();
   struct file** fd_table = t->fd_table;
   struct file* f = fd_table[fd];
@@ -202,9 +206,28 @@ int mmap(int fd, void* addr) {
 
 
   // Page-wise file mapping
-  // do something
+  off_t read_bytes = len;
+  off_t ofs = 0;
+  while (read_bytes > 0) {
+    off_t page_read_bytes = PGSIZE, page_zero_bytes;
+    if (read_bytes < PGSIZE)
+      page_read_bytes = read_bytes;
+    page_zero_bytes = PGSIZE - page_read_bytes;
 
+    uint8_t* kpage = palloc_get_page(0);
+    SPT_insert(m->file, ofs, addr, kpage, page_read_bytes, page_zero_bytes, true, FOR_MMAP);
 
+    if (file_read(m->file, kpage, page_read_bytes) != page_read_bytes) {
+      ASSERT(0);
+      palloc_free_page(kpage);
+      return -1;
+    }
+    memset(kpage + page_read_bytes, 0, page_zero_bytes);
+
+    read_bytes -= page_read_bytes;
+    addr += PGSIZE;
+    ofs += page_read_bytes;
+  }
 
   // return mapping id
   return m->id;
@@ -222,7 +245,6 @@ void munmap(int mapping) {
 
   // Close reopened file
   file_close(m->file);
-
   // free mapping with unmapping page, clearing spt, free frame entry, ...
   // do something
 }
@@ -477,7 +499,7 @@ static void syscall_handler(struct intr_frame* f) {
       check_valid(f->esp + 4);
       check_valid(f->esp + 8);
 
-      mmap(f->esp + 4, f->esp + 8);
+      mmap((int)*(uint32_t*)(f->esp + 4), (void*)*(uint32_t*)(f->esp + 8));
 
       break;
 
@@ -485,7 +507,7 @@ static void syscall_handler(struct intr_frame* f) {
       // void munmap(mapid_t mapping);
       check_valid(f->esp + 4);
 
-      munmap(f->esp + 4);
+      munmap((int)*(uint32_t*)(f->esp + 4));
 
       break;
 

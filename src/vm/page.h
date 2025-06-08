@@ -63,6 +63,4 @@ void SPT_remove(void *page_addr);
 
 void SPT_destroy();
 
-// struct page* get_victim();
-
 #endif /* vm/page.h */
