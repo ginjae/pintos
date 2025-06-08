@@ -206,7 +206,8 @@ void frame_free(void* kpage) {
   struct list_elem* e;
   struct frame* f;
 
-  // lock_acquire(&frame_lock);
+  if (!lock_held_by_current_thread(&frame_lock))
+    lock_acquire(&frame_lock);
 
   if (list_empty(&frame_table)) {
     lock_release(&frame_lock);
@@ -229,5 +230,5 @@ void frame_free(void* kpage) {
       break;
     }
   }
-  // lock_release(&frame_lock);
+  lock_release(&frame_lock);
 }
