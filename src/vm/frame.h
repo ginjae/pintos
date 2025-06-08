@@ -51,7 +51,7 @@ struct frame* find_victim();
 void swap_frame(struct frame* victim);
 
 // Allocate frame & update frame table.
-void* frame_alloc(enum palloc_flags);
+void* frame_alloc(enum palloc_flags, bool);
 
 // Set upage of corresponding struct frame.
 void frame_update_upage(void* upage, void* kpage);

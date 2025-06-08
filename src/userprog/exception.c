@@ -173,11 +173,6 @@ static void page_fault(struct intr_frame* f) {
 
   // Case 0. Bad access -> just raise error.
   if (fault_addr == NULL || !is_user_vaddr(fault_addr)) {
-    if (fault_addr == NULL)
-      printf("fault_addr is null\n");
-    else {
-      printf("fault_addr is not a user vaddr.\n");
-    }
     exit(-1);
   }
 
@@ -196,7 +191,7 @@ static void page_fault(struct intr_frame* f) {
     if (fault_addr <= PHYS_BASE - 0x800000) exit(-1);
 
     if (fault_addr >= esp - 32) {
-      void* kpage = frame_alloc(PAL_USER | PAL_ZERO);
+      void* kpage = frame_alloc(PAL_USER | PAL_ZERO, false);
       struct frame* f = find_frame(kpage);
       f->is_evictable = true;
       f->owner_thread = thread_current();
@@ -206,7 +201,7 @@ static void page_fault(struct intr_frame* f) {
       thread_current()->esp = fault_addr;
       return;
     } else {
-      printf("STACK GROWTH ERROR\n");
+      // printf("STACK GROWTH ERROR\n");
       exit(-1);
     }
   }
@@ -224,7 +219,7 @@ static void page_fault(struct intr_frame* f) {
     // If this fault is caused by write, but the page is not writable,
     // raise error!
     if (write && !writable) {
-      printf("WRITE PERM ERROR\n");
+      // printf("WRITE PERM ERROR\n");
       exit(-1);
     }
     switch (fault_page->purpose) {
@@ -232,7 +227,7 @@ static void page_fault(struct intr_frame* f) {
         if (!fault_page->is_swapped) {
           // Repeat load_segment
           file_seek(file, ofs);
-          uint8_t* kpage = frame_alloc(PAL_USER);
+          uint8_t* kpage = frame_alloc(PAL_USER, true);
 
           struct frame* f = find_frame(kpage);
           f->page_addr = upage;
@@ -244,12 +239,12 @@ static void page_fault(struct intr_frame* f) {
 
           off_t n = file_read(file, kpage, page_read_bytes);
           if (n != (int)page_read_bytes) {
-            printf("File read error\n");
+            // printf("File read error\n");
             frame_free(kpage);
             exit(-1);
           }
-
           memset(kpage + page_read_bytes, 0, page_zero_bytes);
+
           bool ok = pagedir_set_page(thread_current()->pagedir, upage, kpage,
                                      writable);
           if (!ok) {
@@ -264,7 +259,7 @@ static void page_fault(struct intr_frame* f) {
 
           // Repeat load_segment
           file_seek(file, ofs);
-          uint8_t* kpage = frame_alloc(PAL_USER);
+          uint8_t* kpage = frame_alloc(PAL_USER, true);
           // if (!kpage) printf("Your frame_alloc is trash\n");
           struct frame* f = find_frame(kpage);
           f->page_addr = upage;
@@ -274,18 +269,19 @@ static void page_fault(struct intr_frame* f) {
           fault_page->frame_addr = kpage;
 
           // Read from corresponding disk file.
+          /*
           printf(
               "SPT_search hit: %p → frame_addr = %p, is_swapped = %d, swap_i = "
               "%zu\n",
               fault_page_addr, fault_page->frame_addr, fault_page->is_swapped,
               fault_page->swap_i);
+              */
 
           SD_read(swap_i, kpage);
           fault_page->is_swapped = false;
-          memset(kpage + page_read_bytes, 0, page_zero_bytes);
+          // memset(kpage + page_read_bytes, 0, page_zero_bytes);
           bool ok = pagedir_set_page(thread_current()->pagedir, upage, kpage,
                                      writable);
-          printf("Current thread: %s\n", thread_name());
           if (!ok) {
             printf("Failed!: pagedir_set_page in thread: %s\n", thread_name());
           }
@@ -300,7 +296,7 @@ static void page_fault(struct intr_frame* f) {
           // I have no idea. Let's just pray.
 
           // Allocate frame.
-          uint8_t* kpage = frame_alloc(PAL_USER);
+          uint8_t* kpage = frame_alloc(PAL_USER, false);
           fault_page->frame_addr = kpage;
 
           // Setup stack.
@@ -313,7 +309,7 @@ static void page_fault(struct intr_frame* f) {
           size_t swap_i = fault_page->swap_i;
 
           // Allocate frame
-          uint8_t* kpage = frame_alloc(PAL_USER);
+          uint8_t* kpage = frame_alloc(PAL_USER, false);
           struct frame* f = find_frame(kpage);
           f->page_addr = upage;
           f->is_evictable = true;
@@ -323,7 +319,7 @@ static void page_fault(struct intr_frame* f) {
           fault_page->is_swapped = false;
 
           // Read from corresponding disk file.
-          printf("Stack reading swap disk\n");
+          // printf("Stack reading swap disk\n");
           SD_read(swap_i, kpage);
 
           pagedir_set_page(thread_current()->pagedir, upage, kpage, writable);

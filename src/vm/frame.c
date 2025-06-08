@@ -70,9 +70,11 @@ struct frame* find_victim() {
   while (counter < loop_lim) {
     f = list_entry(ft_cursor, struct frame, ftable_elem);
     pagedir = f->owner_thread->pagedir;
-    if (f->page_addr == pg_round_down(PHYS_BASE - 1) &&
-        f->owner_thread == thread_current())
+    struct page* p = SPT_search(f->owner_thread, f->page_addr);
+    if (!p || !f->page_addr ||
+        f->page_addr >= pg_round_down(PHYS_BASE - 0x800000)) {
       f->is_evictable = false;
+    }
 
     if (!f->is_evictable || pagedir_is_accessed(pagedir, f->page_addr)) {
       ft_cursor = list_next(ft_cursor);
@@ -81,7 +83,6 @@ struct frame* find_victim() {
       if (f->is_evictable) pagedir_set_accessed(pagedir, f->page_addr, false);
       counter++;
     } else {
-      void* page_addr = f->page_addr;
       victim_cursor = ft_cursor;
       ft_cursor = list_next(ft_cursor);
       if (ft_cursor == list_end(&frame_table))
@@ -102,12 +103,15 @@ void swap_frame(struct frame* victim) {
   void* frame_addr = victim->frame_addr;
   struct thread* owner = victim->owner_thread;
   struct page* page = SPT_search(owner, page_addr);
-  // printf("Evicting page %p owned by %s\n", page_addr, owner->name);
+  // printf("Evicting page %p whose frame is %p\n", page_addr, frame_addr);
   if (!page) {
     if (victim->is_evictable) printf("NOOOOO\n");
     palloc_free_page(frame_addr);
     free(victim);
     return;
+  }
+  if (!is_user_vaddr(page_addr)) {
+    PANIC("Tried to evict a kernel page!");
   }
 
   enum page_purpose pur = page->purpose;
@@ -119,8 +123,6 @@ void swap_frame(struct frame* victim) {
         uint8_t* bytes = frame_addr;
         page->swap_i = SD_write(frame_addr);
         page->is_swapped = true;
-        printf("page_addr %p is written to swap_i: %zu\n", page_addr,
-               page->swap_i);
         pagedir_set_dirty(owner->pagedir, page_addr, false);
 
       } else {
@@ -131,6 +133,7 @@ void swap_frame(struct frame* victim) {
       break;
 
     case FOR_STACK:
+      ASSERT(victim->is_evictable == false);
       page->swap_i = SD_write(frame_addr);
       page->is_swapped = true;
       break;
@@ -144,18 +147,17 @@ void swap_frame(struct frame* victim) {
       page->is_swapped = false;
       break;
   }
-
-  page->frame_addr = NULL;
-  pagedir_clear_page(owner->pagedir, page_addr);
   palloc_free_page(frame_addr);
+  page->frame_addr = NULL;
+
+  pagedir_clear_page(owner->pagedir, page_addr);
+  free(victim);
 }
 
-void* frame_alloc(enum palloc_flags flags) {
+void* frame_alloc(enum palloc_flags flags, bool is_evictable) {
   // i) create new struct frame
   struct frame* new_frame = malloc(sizeof(struct frame));
   struct frame* victim = NULL;
-
-  new_frame->is_evictable = false;
 
   // ii) assign palloc's result to member void* frame_addr
   uint8_t* kpage = palloc_get_page(flags);
@@ -167,10 +169,10 @@ void* frame_alloc(enum palloc_flags flags) {
     lock_release(&frame_lock);
     swap_frame(victim);
     kpage = palloc_get_page(flags);
-    new_frame->is_evictable = true;
   }
-
+  new_frame->is_evictable = is_evictable;
   new_frame->frame_addr = kpage;
+  new_frame->page_addr = NULL;
 
   // iii) assign current thread to member owner_thread
   new_frame->owner_thread = thread_current();
@@ -187,33 +189,6 @@ void* frame_alloc(enum palloc_flags flags) {
 
   // vi) return kernel virtual address (physical address)
   return kpage;
-}
-
-void frame_add(void* page_addr, void* frame_addr, struct thread* t) {
-  struct list_elem* e;
-  struct frame* f;
-  lock_acquire(&frame_lock);
-
-  for (e = list_begin(&frame_table); e != list_end(&frame_table);
-       e = list_next(e)) {
-    f = list_entry(e, struct frame, ftable_elem);
-    if (f->frame_addr == frame_addr) {
-      break;
-    }
-    f = NULL;
-  }
-  if (f != NULL) {
-    f->page_addr = page_addr;
-    f->owner_thread = t;
-  } else {
-    struct frame* new_frame = malloc(sizeof(struct frame));
-    new_frame->page_addr = page_addr;
-    new_frame->frame_addr = frame_addr;
-    new_frame->owner_thread = t;
-    list_push_back(&frame_table, &new_frame->ftable_elem);
-  }
-
-  lock_release(&frame_lock);
 }
 
 void frame_update_upage(void* upage, void* kpage) {

@@ -51,6 +51,7 @@ void SD_read(size_t idx, void *page) {
   for (i = idx; i < idx + SEC_PER_PAGE; i++) {
     block_read(swap_disk, i, page + BLOCK_SECTOR_SIZE * (i - idx));
   }
+  if (idx != 0) bitmap_set_multiple(disk_map, idx, SEC_PER_PAGE, FREE);
   lock_release(&swap_lock);
 }
 
