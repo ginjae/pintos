@@ -12,6 +12,7 @@
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "userprog/process.h"
+#include "vm/mmap.h"
 
 static void syscall_handler(struct intr_frame*);
 
@@ -172,6 +173,60 @@ void touch_addr(void* addr) {
   uint8_t* temp_addr = (void*)addr;
   volatile uint8_t touch = *temp_addr;
 }
+
+/* Map files into process address space */
+int mmap(int fd, void* addr) {
+  // Validation
+  if (fd == 0 || fd == 1 || addr == NULL || pg_ofs(addr) != 0)
+    return -1;
+  struct thread* t = thread_current();
+  struct file** fd_table = t->fd_table;
+  struct file* f = fd_table[fd];
+  if (f == NULL)
+    return -1;
+  off_t len = file_length(f);
+  if (len == 0)
+    return -1;
+  // The range of pages mapped overlaps any exisitng set of mapped pages -> fail
+  // if ()
+
+
+  // Insert mapping to mmap_table
+  struct mapping* m = malloc(sizeof (struct mapping));
+  m->id = list_size(&t->mmap_table) + 1;
+  m->addr = addr;
+  m->size = len;
+  m->file = file_reopen(f);
+  m->fd = fd;
+  list_push_back(&t->mmap_table, &m->elem);
+
+
+  // Page-wise file mapping
+  // do something
+
+
+
+  // return mapping id
+  return m->id;
+}
+
+/* Unmap the mapping */
+void munmap(int mapping) {
+  struct thread* t = thread_current();
+  struct mapping* m = find_mapping_id(&t->mmap_table, mapping);
+  if(m == NULL)
+    exit(-1);
+
+  // Check whether the pages are dirty. If so, call `file_write_at`
+  // do something
+
+  // Close reopened file
+  file_close(m->file);
+
+  // free mapping with unmapping page, clearing spt, free frame entry, ...
+  // do something
+}
+
 
 static void syscall_handler(struct intr_frame* f) {
   // printf("case: %d\n", *(uint32_t*)f->esp);
@@ -414,6 +469,24 @@ static void syscall_handler(struct intr_frame* f) {
     case SYS_CLOSE:
       check_valid(f->esp + 4);
       close((int)*(uint32_t*)(f->esp + 4));
+      break;
+
+    case SYS_MMAP:    /* Map a file into memory. */
+      // mapid_t mmap(int fd, void *addr)
+
+      check_valid(f->esp + 4);
+      check_valid(f->esp + 8);
+
+      mmap(f->esp + 4, f->esp + 8);
+
+      break;
+
+    case SYS_MUNMAP:  /* Remove a memory mapping. */
+      // void munmap(mapid_t mapping);
+      check_valid(f->esp + 4);
+
+      munmap(f->esp + 4);
+
       break;
 
     default:

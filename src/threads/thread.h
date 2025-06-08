@@ -122,7 +122,10 @@ struct thread {
   struct hash SPT; /* PER-PROCESS SPT */
   void* esp;       /* stack pointer of this process.*/
 
+  struct list mmap_table;  /* List of mappings (mmap table) */
+
 #endif
+
 
   /* Owned by thread.c. */
   unsigned magic; /* Detects stack overflow. */
