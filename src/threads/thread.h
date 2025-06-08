@@ -122,7 +122,8 @@ struct thread {
   struct hash SPT; /* PER-PROCESS SPT */
   void* esp;       /* stack pointer of this process.*/
 
-  struct list mmap_table;  /* List of mappings (mmap table) */
+  struct list mmap_table;   /* List of mappings (mmap table) */
+  void* data_segment_start; /* Pointer to the starting point of data segment */
 #endif
 
 

@@ -426,6 +426,7 @@ bool load(const char* file_name, void (**eip)(void), void** esp) {
       case PT_LOAD:
         if (validate_segment(&phdr, file)) {
           bool writable = (phdr.p_flags & PF_W) != 0;
+          t->data_segment_start = (void*) phdr.p_vaddr;
           uint32_t file_page = phdr.p_offset & ~PGMASK;
           uint32_t mem_page = phdr.p_vaddr & ~PGMASK;
           uint32_t page_offset = phdr.p_vaddr & PGMASK;

@@ -198,7 +198,7 @@ int mmap(int fd, void* addr) {
   // The range of pages mapped overlaps any exisitng set of mapped pages -> fail
   if (find_mapping_addr(&t->mmap_table, addr) != NULL)
     return -1;
-  if (addr >= PHYS_BASE - PGSIZE)
+  if (addr >= PHYS_BASE - PGSIZE || addr <= t->data_segment_start)
     return -1;
 
   // Insert mapping to mmap_table
