@@ -238,16 +238,31 @@ int mmap(int fd, void* addr) {
 
 /* Unmap the mapping */
 void munmap(int mapping) {
-  // struct thread* t = thread_current();
-  // struct mapping* m = find_mapping_id(&t->mmap_table, mapping);
-  // if(m == NULL)
-  //   exit(-1);
+  struct thread* t = thread_current();
+  struct mapping* m = find_mapping_id(&t->mmap_table, mapping);
+  if(m == NULL)
+    exit(-1);
 
   // Check whether the pages are dirty. If so, call `file_write_at`
-  // do something
+  struct list_elem* e;
+  struct frame* f;
+  struct hash* spt = &t->SPT;
+  struct hash_iterator it;
+  hash_first(&it, spt);
+  lock_acquire(&filesys_lock);
+  while (hash_next(&it)) {
+    struct page *p = hash_entry(hash_cur(&it), struct page, SPT_elem);
+    if (p->purpose != FOR_MMAP)
+      continue;
+    void *addr = p->page_addr;
+    if (pagedir_is_dirty(t->pagedir, addr))
+      file_write_at(p->page_file, p->page_addr, p->read_bytes, p->ofs);
+  }
+  lock_release(&filesys_lock);
 
   // Close reopened file
-  // file_close(m->file);
+  file_close(m->file);
+
   // free mapping with unmapping page, clearing spt, free frame entry, ...
   // do something
 }
