@@ -68,7 +68,8 @@ int read(int fd, void* buffer, unsigned size) {
     exit(-1);
     return -1;
   }
-  check_valid(buffer);
+  int j;
+  for (j = 0; j < size; j++) touch_addr(buffer + j);
 
   lock_acquire(&filesys_lock);
   if (fd == 0) {
@@ -95,7 +96,8 @@ int write(int fd, void* buffer, unsigned size) {
     exit(-1);
     return -1;
   }
-  check_valid(buffer);
+  int j;
+  for (j = 0; j < size; j++) touch_addr(buffer + j);
 
   lock_acquire(&filesys_lock);
   if (fd == 1) {
