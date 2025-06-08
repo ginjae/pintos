@@ -70,6 +70,9 @@ struct frame* find_victim() {
   while (counter < loop_lim) {
     f = list_entry(ft_cursor, struct frame, ftable_elem);
     pagedir = f->owner_thread->pagedir;
+    if (f->page_addr == pg_round_down(PHYS_BASE - 1) &&
+        f->owner_thread == thread_current())
+      f->is_evictable = false;
 
     if (!f->is_evictable || pagedir_is_accessed(pagedir, f->page_addr)) {
       ft_cursor = list_next(ft_cursor);
@@ -99,30 +102,36 @@ void swap_frame(struct frame* victim) {
   void* frame_addr = victim->frame_addr;
   struct thread* owner = victim->owner_thread;
   struct page* page = SPT_search(owner, page_addr);
+  // printf("Evicting page %p owned by %s\n", page_addr, owner->name);
   if (!page) {
-    printf("Evicting page %p owned by %s\n", page_addr, owner->name);
     if (victim->is_evictable) printf("NOOOOO\n");
     palloc_free_page(frame_addr);
     free(victim);
     return;
   }
 
-  // printf("swap_i: %zu\n", page->swap_i);
-
   enum page_purpose pur = page->purpose;
-  size_t idx = page->swap_i;
 
   switch (pur) {
     case FOR_FILE:
       if (pagedir_is_dirty(owner->pagedir, page_addr)) {
-        page->swap_i = SD_write(idx, frame_addr);
+        // printf("swap_i before write: %zu\n", page->swap_i);
+        uint8_t* bytes = frame_addr;
+        page->swap_i = SD_write(frame_addr);
+        page->is_swapped = true;
+        printf("page_addr %p is written to swap_i: %zu\n", page_addr,
+               page->swap_i);
         pagedir_set_dirty(owner->pagedir, page_addr, false);
+
+      } else {
+        page->swap_i = BITMAP_ERROR;
+        page->is_swapped = false;
       }
-      page->is_swapped = true;
+
       break;
 
     case FOR_STACK:
-      page->swap_i = SD_write(idx, frame_addr);
+      page->swap_i = SD_write(frame_addr);
       page->is_swapped = true;
       break;
 
@@ -131,6 +140,7 @@ void swap_frame(struct frame* victim) {
         file_write_at(page->page_file, frame_addr, PGSIZE, page->ofs);
         pagedir_set_dirty(owner->pagedir, page_addr, false);
       }
+      page->swap_i = BITMAP_ERROR;
       page->is_swapped = false;
       break;
   }
@@ -170,10 +180,10 @@ void* frame_alloc(enum palloc_flags flags) {
 
   // v) push struct into static struct list frame_table.
   //    since this is the critical section, use lock!
-  // lock_acquire(&frame_lock);
+  lock_acquire(&frame_lock);
   list_push_back(&frame_table, &new_frame->ftable_elem);
   if (!ft_cursor) ft_cursor = list_begin(&frame_table);
-  // lock_release(&frame_lock);
+  lock_release(&frame_lock);
 
   // vi) return kernel virtual address (physical address)
   return kpage;

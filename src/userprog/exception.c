@@ -153,9 +153,7 @@ static void page_fault(struct intr_frame* f) {
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  // printf("Page fault at %p: %s error %s page in %s context.\n", fault_addr,
-  //        not_present ? "not present" : "rights violation",
-  //        write ? "writing" : "reading", user ? "user" : "kernel");
+
   //  #ifdef USERPROG
   //    printf("%s: exit(%d)\n", thread_name(),
   //           thread_current()->exit_status);  // FIXME: pseudo-calling exit()
@@ -174,7 +172,14 @@ static void page_fault(struct intr_frame* f) {
     esp = thread_current()->esp;
 
   // Case 0. Bad access -> just raise error.
-  if (fault_addr == NULL || !is_user_vaddr(fault_addr)) exit(-1);
+  if (fault_addr == NULL || !is_user_vaddr(fault_addr)) {
+    if (fault_addr == NULL)
+      printf("fault_addr is null\n");
+    else {
+      printf("fault_addr is not a user vaddr.\n");
+    }
+    exit(-1);
+  }
 
   // printf("Fault at %p, eip = %p, esp = %p\n", fault_addr, f->eip, f->esp);
 
@@ -192,11 +197,16 @@ static void page_fault(struct intr_frame* f) {
 
     if (fault_addr >= esp - 32) {
       void* kpage = frame_alloc(PAL_USER | PAL_ZERO);
+      struct frame* f = find_frame(kpage);
+      f->is_evictable = true;
+      f->owner_thread = thread_current();
+
       pagedir_set_page(thread_current()->pagedir, fault_page_addr, kpage, true);
       SPT_insert(NULL, 0, fault_page_addr, kpage, 0, PGSIZE, true, FOR_STACK);
       thread_current()->esp = fault_addr;
       return;
     } else {
+      printf("STACK GROWTH ERROR\n");
       exit(-1);
     }
   }
@@ -210,23 +220,31 @@ static void page_fault(struct intr_frame* f) {
     size_t page_read_bytes = fault_page->read_bytes;
     size_t page_zero_bytes = fault_page->zero_bytes;
     bool writable = fault_page->is_writable;
+
     // If this fault is caused by write, but the page is not writable,
     // raise error!
-    if (write && !writable) exit(-1);
+    if (write && !writable) {
+      printf("WRITE PERM ERROR\n");
+      exit(-1);
+    }
     switch (fault_page->purpose) {
       case FOR_FILE:
         if (!fault_page->is_swapped) {
           // Repeat load_segment
           file_seek(file, ofs);
           uint8_t* kpage = frame_alloc(PAL_USER);
-          fault_page->frame_addr = kpage;
 
-          struct frame* new_frame = find_frame(kpage);
-          new_frame->page_addr = upage;
-          new_frame->is_evictable = true;
+          struct frame* f = find_frame(kpage);
+          f->page_addr = upage;
+          f->is_evictable = true;
+          f->owner_thread = thread_current();
+
+          fault_page->frame_addr = kpage;
+          fault_page->is_swapped = false;
 
           off_t n = file_read(file, kpage, page_read_bytes);
           if (n != (int)page_read_bytes) {
+            printf("File read error\n");
             frame_free(kpage);
             exit(-1);
           }
@@ -243,19 +261,31 @@ static void page_fault(struct intr_frame* f) {
         } else {
           // FIXME: Page is in the swap disk.
           size_t swap_i = fault_page->swap_i;
-          // if (swap_i == 0) printf("swap index is 0!!!!\n");
 
           // Repeat load_segment
           file_seek(file, ofs);
           uint8_t* kpage = frame_alloc(PAL_USER);
           // if (!kpage) printf("Your frame_alloc is trash\n");
+          struct frame* f = find_frame(kpage);
+          f->page_addr = upage;
+          f->is_evictable = true;
+          f->owner_thread = thread_current();
+
           fault_page->frame_addr = kpage;
 
           // Read from corresponding disk file.
+          printf(
+              "SPT_search hit: %p → frame_addr = %p, is_swapped = %d, swap_i = "
+              "%zu\n",
+              fault_page_addr, fault_page->frame_addr, fault_page->is_swapped,
+              fault_page->swap_i);
+
           SD_read(swap_i, kpage);
+          fault_page->is_swapped = false;
           memset(kpage + page_read_bytes, 0, page_zero_bytes);
           bool ok = pagedir_set_page(thread_current()->pagedir, upage, kpage,
                                      writable);
+          printf("Current thread: %s\n", thread_name());
           if (!ok) {
             printf("Failed!: pagedir_set_page in thread: %s\n", thread_name());
           }
@@ -270,7 +300,7 @@ static void page_fault(struct intr_frame* f) {
           // I have no idea. Let's just pray.
 
           // Allocate frame.
-          uint8_t* kpage = frame_alloc(PAL_USER | PAL_ZERO);
+          uint8_t* kpage = frame_alloc(PAL_USER);
           fault_page->frame_addr = kpage;
 
           // Setup stack.
@@ -284,10 +314,18 @@ static void page_fault(struct intr_frame* f) {
 
           // Allocate frame
           uint8_t* kpage = frame_alloc(PAL_USER);
+          struct frame* f = find_frame(kpage);
+          f->page_addr = upage;
+          f->is_evictable = true;
+          f->owner_thread = thread_current();
+
           fault_page->frame_addr = kpage;
+          fault_page->is_swapped = false;
 
           // Read from corresponding disk file.
+          printf("Stack reading swap disk\n");
           SD_read(swap_i, kpage);
+
           pagedir_set_page(thread_current()->pagedir, upage, kpage, writable);
           thread_current()->esp = fault_addr;
           return;
@@ -298,9 +336,12 @@ static void page_fault(struct intr_frame* f) {
         break;
 
       default:
+        printf("You reached the undefined purpose\n");
         exit(-1);
     }
   }
+
+  printf("You reached the unreachable.\n");
 
   exit(-1);
 }
