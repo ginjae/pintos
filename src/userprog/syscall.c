@@ -202,6 +202,7 @@ int mmap(int fd, void* addr) {
   m->size = len;
   m->file = file_reopen(f);
   m->fd = fd;
+  list_init(&m->pages);
   list_push_back(&t->mmap_table, &m->elem);
 
   // Page-wise file mapping
@@ -213,8 +214,9 @@ int mmap(int fd, void* addr) {
     page_zero_bytes = PGSIZE - page_read_bytes;
 
     uint8_t* kpage = palloc_get_page(0);
-    SPT_insert(m->file, ofs, addr, kpage, page_read_bytes, page_zero_bytes,
+    struct page *temp = SPT_insert(m->file, ofs, addr, kpage, page_read_bytes, page_zero_bytes,
                true, FOR_MMAP);
+    list_push_back(&m->pages, &temp->MMAP_elem);
 
     if (file_read(m->file, kpage, page_read_bytes) != page_read_bytes) {
       ASSERT(0);
@@ -262,8 +264,21 @@ void munmap_free(struct thread* t, int mapping) {
   }
 
   // Close reopened file
-  file_close(m->file);
+  // file_close(m->file);
 
+  // free mapping with unmapping page, clearing spt, free frame entry, ...
+  struct list_elem* e;
+  for (e = list_begin(&m->pages); e != list_end(&m->pages); e = list_next(e)) {
+    struct page* p = list_entry(e, struct page, MMAP_elem);
+    frame_free(p->page_addr);
+    pagedir_clear_page(t->pagedir, p->page_addr);
+    // SPT_remove(p->page_addr);
+    hash_delete(&t->SPT, &p->SPT_elem);
+  }
+  list_remove(&m->elem);
+  free(m);
+
+  /*
   // Check whether the pages are dirty. If so, call `file_write_at`
   struct list_elem* e;
   // struct frame* f;
@@ -285,6 +300,7 @@ void munmap_free(struct thread* t, int mapping) {
 
   // hash_delete(&t->SPT, &m->elem);
   // free(m);
+  */
 }
 
 /* Unmap the mapping */
@@ -331,7 +347,7 @@ void munmap(int mapping) {
 
   struct thread* t = thread_current();
   munmap_write(t, mapping, false);
-  // munmap_free(t, mapping);
+  munmap_free(t, mapping);
 }
 
 static void syscall_handler(struct intr_frame* f) {

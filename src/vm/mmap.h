@@ -12,6 +12,7 @@ struct mapping {
     struct file *file;
     int fd;
     struct list_elem elem;
+    struct list pages;
 };
 
 struct mapping *find_mapping_addr(struct list* mmap_table, void* addr);

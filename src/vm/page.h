@@ -45,6 +45,7 @@ struct page {
   size_t zero_bytes;       // size of remaining page (should be zeroed)
 
   struct hash_elem SPT_elem;  // hash elem for hash SPT
+  struct list_elem MMAP_elem; // list elem for MMAP mapping
 };
 
 // Initialize list object named frame_table. Call this in load()!
@@ -55,9 +56,9 @@ struct page *SPT_search(struct thread *owner, void *page_addr);
 
 // Insert new page "to-do list" into SPT.
 // Arguments are copied from load_segment() in process.c
-void SPT_insert(struct file *f, off_t ofs, void *page_addr, void *frame_addr,
-                size_t read_bytes, size_t zero_bytes, bool writable,
-                enum page_purpose purpose);
+struct page *SPT_insert(struct file *f, off_t ofs, void *page_addr, void *frame_addr,
+                        size_t read_bytes, size_t zero_bytes, bool writable,
+                        enum page_purpose purpose);
 
 void SPT_remove(void *page_addr);
 

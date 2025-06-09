@@ -64,9 +64,9 @@ struct page *SPT_search(struct thread *owner, void *page_addr) {
   }
 }
 
-void SPT_insert(struct file *f, off_t ofs, void *page_addr, void *frame_addr,
-                size_t read_bytes, size_t zero_bytes, bool writable,
-                enum page_purpose purpose) {
+struct page *SPT_insert(struct file *f, off_t ofs, void *page_addr, void *frame_addr,
+                        size_t read_bytes, size_t zero_bytes, bool writable,
+                        enum page_purpose purpose) {
   if (SPT_search(thread_current(), page_addr) != NULL) {
     printf("EXIST NO!!!!\n");
     return;
@@ -90,6 +90,7 @@ void SPT_insert(struct file *f, off_t ofs, void *page_addr, void *frame_addr,
     frame->is_evictable = true;
   }
   hash_insert(&thread_current()->SPT, &p->SPT_elem);
+  return p;
 }
 
 void SPT_remove(void *page_addr) {
