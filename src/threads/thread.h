@@ -126,7 +126,6 @@ struct thread {
   void* data_segment_start; /* Pointer to the starting point of data segment */
 #endif
 
-
   /* Owned by thread.c. */
   unsigned magic; /* Detects stack overflow. */
 };

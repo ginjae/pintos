@@ -229,6 +229,11 @@ void process_exit(void) {
   struct list_elem* e;
 
   uint32_t* pd;
+  for (e = list_begin(&cur->mmap_table); e != list_end(&cur->mmap_table);
+       e = list_next(e)) {
+    struct mapping* m = list_entry(e, struct mapping, elem);
+    munmap_write(cur, m->id, false);
+  }
 
   // release lock & remove childelem before destroying pd
   sema_up(&(cur->child_sema));
@@ -240,7 +245,7 @@ void process_exit(void) {
   for (e = list_begin(&cur->mmap_table); e != list_end(&cur->mmap_table);
        e = list_next(e)) {
     struct mapping* m = list_entry(e, struct mapping, elem);
-    munmap(m->id);
+    munmap_free(cur, m->id);
   }
 
   // Close files that process opened
@@ -269,7 +274,7 @@ void process_exit(void) {
   }
 
   /* Destroy the current process's page directory and switch back
-     to the kernel-only page directory. */
+   to the kernel-only page directory. */
   pd = cur->pagedir;
   if (pd != NULL) {
     /* Correct ordering here is crucial.  We must set

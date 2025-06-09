@@ -1,8 +1,8 @@
 #include "userprog/syscall.h"
 
+#include <hash.h>
 #include <stdio.h>
 #include <syscall-nr.h>
-#include <hash.h>
 
 #include "devices/shutdown.h"
 #include "filesys/file.h"
@@ -14,9 +14,9 @@
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "userprog/process.h"
+#include "vm/frame.h"
 #include "vm/mmap.h"
 #include "vm/page.h"
-#include "vm/frame.h"
 
 static void syscall_handler(struct intr_frame*);
 
@@ -183,26 +183,20 @@ void touch_addr(void* addr) {
 /* Map files into process address space */
 int mmap(int fd, void* addr) {
   // Validation
-  if (fd == 0 || fd == 1 || addr == NULL)
-    return -1;
-  if (pg_ofs(addr) != 0) 
-    return -1;
+  if (fd == 0 || fd == 1 || addr == NULL) return -1;
+  if (pg_ofs(addr) != 0) return -1;
   struct thread* t = thread_current();
   struct file** fd_table = t->fd_table;
   struct file* f = fd_table[fd];
-  if (f == NULL)
-    return -1;
+  if (f == NULL) return -1;
   off_t len = file_length(f);
-  if (len == 0)
-    return -1;
+  if (len == 0) return -1;
   // The range of pages mapped overlaps any exisitng set of mapped pages -> fail
-  if (find_mapping_addr(&t->mmap_table, addr) != NULL)
-    return -1;
-  if (addr >= PHYS_BASE - PGSIZE || addr <= t->data_segment_start)
-    return -1;
+  if (find_mapping_addr(&t->mmap_table, addr) != NULL) return -1;
+  if (addr >= PHYS_BASE - PGSIZE || addr <= t->data_segment_start) return -1;
 
   // Insert mapping to mmap_table
-  struct mapping* m = malloc(sizeof (struct mapping));
+  struct mapping* m = malloc(sizeof(struct mapping));
   m->id = list_size(&t->mmap_table) + 1;
   m->addr = addr;
   m->size = len;
@@ -210,18 +204,17 @@ int mmap(int fd, void* addr) {
   m->fd = fd;
   list_push_back(&t->mmap_table, &m->elem);
 
-
   // Page-wise file mapping
   off_t read_bytes = len;
   off_t ofs = 0;
   while (read_bytes > 0) {
     off_t page_read_bytes = PGSIZE, page_zero_bytes;
-    if (read_bytes < PGSIZE)
-      page_read_bytes = read_bytes;
+    if (read_bytes < PGSIZE) page_read_bytes = read_bytes;
     page_zero_bytes = PGSIZE - page_read_bytes;
 
     uint8_t* kpage = palloc_get_page(0);
-    SPT_insert(m->file, ofs, addr, kpage, page_read_bytes, page_zero_bytes, true, FOR_MMAP);
+    SPT_insert(m->file, ofs, addr, kpage, page_read_bytes, page_zero_bytes,
+               true, FOR_MMAP);
 
     if (file_read(m->file, kpage, page_read_bytes) != page_read_bytes) {
       ASSERT(0);
@@ -239,24 +232,78 @@ int mmap(int fd, void* addr) {
   return m->id;
 }
 
-/* Unmap the mapping */
-void munmap(int mapping) {
-  struct thread* t = thread_current();
+/* Write mapping's content to the file */
+void munmap_write(struct thread* t, int mapping, bool unmap) {
   struct mapping* m = find_mapping_id(&t->mmap_table, mapping);
-  if (m == NULL)
-    exit(-1);
+  if (m == NULL) exit(-1);
 
   // Check whether the pages are dirty. If so, call `file_write_at`
   struct list_elem* e;
-  struct frame* f;
+  // struct frame* f;
   struct hash* spt = &t->SPT;
   struct hash_iterator it;
   hash_first(&it, spt);
   lock_acquire(&filesys_lock);
   while (hash_next(&it)) {
-    struct page *p = hash_entry(hash_cur(&it), struct page, SPT_elem);
-    if (p->purpose != FOR_MMAP)
-      continue;
+    struct page* p = hash_entry(hash_cur(&it), struct page, SPT_elem);
+    if (p->purpose != FOR_MMAP) continue;
+    void* addr = p->page_addr;
+    if (pagedir_is_dirty(t->pagedir, addr))
+      file_write_at(p->page_file, p->page_addr, p->read_bytes, p->ofs);
+  }
+  lock_release(&filesys_lock);
+}
+
+void munmap_free(struct thread* t, int mapping) {
+  struct mapping* m = find_mapping_id(&t->mmap_table, mapping);
+
+  if (m == NULL) {
+    exit(-1);
+  }
+
+  // Close reopened file
+  file_close(m->file);
+
+  // Check whether the pages are dirty. If so, call `file_write_at`
+  struct list_elem* e;
+  // struct frame* f;
+  struct hash* spt = &t->SPT;
+  struct hash_iterator it;
+
+  // free mapping with unmapping page, clearing spt, free frame entry, ...
+
+  hash_first(&it, spt);
+  while (hash_next(&it)) {
+    struct page* p = hash_entry(hash_cur(&it), struct page, SPT_elem);
+    if (p->purpose != FOR_MMAP) continue;
+    void* addr = p->page_addr;
+    void* frame_addr = p->frame_addr;
+    // frame_free(addr);
+    // pagedir_clear_page(t->pagedir, addr);
+    // palloc_free_page(frame_addr);
+  }
+
+  // hash_delete(&t->SPT, &m->elem);
+  // free(m);
+}
+
+/* Unmap the mapping */
+void munmap(int mapping) {
+  /*
+  struct thread* t = thread_current();
+  struct mapping* m = find_mapping_id(&t->mmap_table, mapping);
+  if (m == NULL) exit(-1);
+
+  // Check whether the pages are dirty. If so, call `file_write_at`
+  struct list_elem* e;
+  // struct frame* f;
+  struct hash* spt = &t->SPT;
+  struct hash_iterator it;
+  hash_first(&it, spt);
+  lock_acquire(&filesys_lock);
+  while (hash_next(&it)) {
+    struct page* p = hash_entry(hash_cur(&it), struct page, SPT_elem);
+    if (p->purpose != FOR_MMAP) continue;
     void* addr = p->page_addr;
     if (pagedir_is_dirty(t->pagedir, addr))
       file_write_at(p->page_file, p->page_addr, p->read_bytes, p->ofs);
@@ -269,9 +316,8 @@ void munmap(int mapping) {
   // free mapping with unmapping page, clearing spt, free frame entry, ...
   hash_first(&it, spt);
   while (hash_next(&it)) {
-    struct page *p = hash_entry(hash_cur(&it), struct page, SPT_elem);
-    if (p->purpose != FOR_MMAP)
-      continue;
+    struct page* p = hash_entry(hash_cur(&it), struct page, SPT_elem);
+    if (p->purpose != FOR_MMAP) continue;
     void* addr = p->page_addr;
     void* frame_addr = p->frame_addr;
     frame_free(addr);
@@ -281,8 +327,12 @@ void munmap(int mapping) {
 
   hash_delete(&t->SPT, &m->elem);
   free(m);
-}
+  */
 
+  struct thread* t = thread_current();
+  munmap_write(t, mapping, false);
+  // munmap_free(t, mapping);
+}
 
 static void syscall_handler(struct intr_frame* f) {
   // printf("case: %d\n", *(uint32_t*)f->esp);
@@ -527,17 +577,18 @@ static void syscall_handler(struct intr_frame* f) {
       close((int)*(uint32_t*)(f->esp + 4));
       break;
 
-    case SYS_MMAP:    /* Map a file into memory. */
+    case SYS_MMAP: /* Map a file into memory. */
       // mapid_t mmap(int fd, void *addr)
 
       check_valid(f->esp + 4);
       check_valid(f->esp + 8);
 
-      f->eax = mmap((int)*(uint32_t*)(f->esp + 4), (void*)*(uint32_t*)(f->esp + 8));
+      f->eax =
+          mmap((int)*(uint32_t*)(f->esp + 4), (void*)*(uint32_t*)(f->esp + 8));
 
       break;
 
-    case SYS_MUNMAP:  /* Remove a memory mapping. */
+    case SYS_MUNMAP: /* Remove a memory mapping. */
       // void munmap(mapid_t mapping);
       check_valid(f->esp + 4);
 
