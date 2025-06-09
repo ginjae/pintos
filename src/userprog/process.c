@@ -20,11 +20,11 @@
 #include "threads/vaddr.h"
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
-#include "userprog/tss.h"
 #include "userprog/syscall.h"
+#include "userprog/tss.h"
 #include "vm/frame.h"
-#include "vm/page.h"
 #include "vm/mmap.h"
+#include "vm/page.h"
 
 static thread_func start_process NO_RETURN;
 static bool load(const char* cmdline, void (**eip)(void), void** esp);
@@ -236,8 +236,10 @@ void process_exit(void) {
   list_remove(&(cur->childelem));
 
   // Destroy all mappings
-  for (e = list_begin(&cur->mmap_table); e != list_end(&cur->mmap_table); e = list_next(e)) {
-    struct mapping *m = list_entry(e, struct mapping, elem);
+  // printf("[Thread %s is calling munmap!]\n", thread_name());
+  for (e = list_begin(&cur->mmap_table); e != list_end(&cur->mmap_table);
+       e = list_next(e)) {
+    struct mapping* m = list_entry(e, struct mapping, elem);
     munmap(m->id);
   }
 
@@ -426,7 +428,7 @@ bool load(const char* file_name, void (**eip)(void), void** esp) {
       case PT_LOAD:
         if (validate_segment(&phdr, file)) {
           bool writable = (phdr.p_flags & PF_W) != 0;
-          t->data_segment_start = (void*) phdr.p_vaddr;
+          t->data_segment_start = (void*)phdr.p_vaddr;
           uint32_t file_page = phdr.p_offset & ~PGMASK;
           uint32_t mem_page = phdr.p_vaddr & ~PGMASK;
           uint32_t page_offset = phdr.p_vaddr & PGMASK;
