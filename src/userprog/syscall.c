@@ -241,14 +241,9 @@ void munmap_write(struct thread* t, int mapping, bool unmap) {
 
   // Check whether the pages are dirty. If so, call `file_write_at`
   struct list_elem* e;
-  // struct frame* f;
-  struct hash* spt = &t->SPT;
-  struct hash_iterator it;
-  hash_first(&it, spt);
   lock_acquire(&filesys_lock);
-  while (hash_next(&it)) {
-    struct page* p = hash_entry(hash_cur(&it), struct page, SPT_elem);
-    if (p->purpose != FOR_MMAP) continue;
+  for (e = list_begin(&m->pages); e != list_end(&m->pages); e = list_next(e)) {
+    struct page* p = list_entry(e, struct page, MMAP_elem);
     void* addr = p->page_addr;
     if (pagedir_is_dirty(t->pagedir, addr))
       file_write_at(p->page_file, p->page_addr, p->read_bytes, p->ofs);
@@ -264,7 +259,7 @@ void munmap_free(struct thread* t, int mapping) {
   }
 
   // Close reopened file
-  // file_close(m->file);
+  file_close(m->file);
 
   // free mapping with unmapping page, clearing spt, free frame entry, ...
   struct list_elem* e;
@@ -277,74 +272,10 @@ void munmap_free(struct thread* t, int mapping) {
   }
   list_remove(&m->elem);
   free(m);
-
-  /*
-  // Check whether the pages are dirty. If so, call `file_write_at`
-  struct list_elem* e;
-  // struct frame* f;
-  struct hash* spt = &t->SPT;
-  struct hash_iterator it;
-
-  // free mapping with unmapping page, clearing spt, free frame entry, ...
-
-  hash_first(&it, spt);
-  while (hash_next(&it)) {
-    struct page* p = hash_entry(hash_cur(&it), struct page, SPT_elem);
-    if (p->purpose != FOR_MMAP) continue;
-    void* addr = p->page_addr;
-    void* frame_addr = p->frame_addr;
-    // frame_free(addr);
-    // pagedir_clear_page(t->pagedir, addr);
-    // palloc_free_page(frame_addr);
-  }
-
-  // hash_delete(&t->SPT, &m->elem);
-  // free(m);
-  */
 }
 
 /* Unmap the mapping */
 void munmap(int mapping) {
-  /*
-  struct thread* t = thread_current();
-  struct mapping* m = find_mapping_id(&t->mmap_table, mapping);
-  if (m == NULL) exit(-1);
-
-  // Check whether the pages are dirty. If so, call `file_write_at`
-  struct list_elem* e;
-  // struct frame* f;
-  struct hash* spt = &t->SPT;
-  struct hash_iterator it;
-  hash_first(&it, spt);
-  lock_acquire(&filesys_lock);
-  while (hash_next(&it)) {
-    struct page* p = hash_entry(hash_cur(&it), struct page, SPT_elem);
-    if (p->purpose != FOR_MMAP) continue;
-    void* addr = p->page_addr;
-    if (pagedir_is_dirty(t->pagedir, addr))
-      file_write_at(p->page_file, p->page_addr, p->read_bytes, p->ofs);
-  }
-  lock_release(&filesys_lock);
-
-  // Close reopened file
-  file_close(m->file);
-
-  // free mapping with unmapping page, clearing spt, free frame entry, ...
-  hash_first(&it, spt);
-  while (hash_next(&it)) {
-    struct page* p = hash_entry(hash_cur(&it), struct page, SPT_elem);
-    if (p->purpose != FOR_MMAP) continue;
-    void* addr = p->page_addr;
-    void* frame_addr = p->frame_addr;
-    frame_free(addr);
-    pagedir_clear_page(t->pagedir, addr);
-    palloc_free_page(frame_addr);
-  }
-
-  hash_delete(&t->SPT, &m->elem);
-  free(m);
-  */
-
   struct thread* t = thread_current();
   munmap_write(t, mapping, false);
   munmap_free(t, mapping);
