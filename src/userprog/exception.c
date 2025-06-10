@@ -222,182 +222,68 @@ static void page_fault(struct intr_frame* f) {
       // printf("WRITE PERM ERROR\n");
       exit(-1);
     }
-    switch (fault_page->purpose) {
-      case FOR_FILE:
-        if (!fault_page->is_swapped) {
-          // Repeat load_segment
-          file_seek(file, ofs);
-          uint8_t* kpage = frame_alloc(PAL_USER, true);
+    if (!fault_page->is_swapped) {
+      // Repeat load_segment
+      file_seek(file, ofs);
+      uint8_t* kpage = frame_alloc(PAL_USER, true);
 
-          struct frame* f = find_frame(kpage);
-          f->page_addr = upage;
-          f->is_evictable = true;
-          f->owner_thread = thread_current();
+      struct frame* f = find_frame(kpage);
+      f->page_addr = upage;
+      f->is_evictable = true;
+      f->owner_thread = thread_current();
 
-          fault_page->frame_addr = kpage;
-          fault_page->is_swapped = false;
+      fault_page->frame_addr = kpage;
+      fault_page->is_swapped = false;
 
-          off_t n = file_read(file, kpage, page_read_bytes);
-          if (n != (int)page_read_bytes) {
-            // printf("File read error\n");
-            frame_free(kpage);
-            exit(-1);
-          }
-          memset(kpage + page_read_bytes, 0, page_zero_bytes);
-
-          bool ok = pagedir_set_page(thread_current()->pagedir, upage, kpage,
-                                     writable);
-          if (!ok) {
-            printf("Failed!: pagedir_set_page in thread: %s\n", thread_name());
-          }
-
-          return;
-
-        } else {
-          // FIXME: Page is in the swap disk.
-          size_t swap_i = fault_page->swap_i;
-
-          // Repeat load_segment
-          file_seek(file, ofs);
-          uint8_t* kpage = frame_alloc(PAL_USER, true);
-          // if (!kpage) printf("Your frame_alloc is trash\n");
-          struct frame* f = find_frame(kpage);
-          f->page_addr = upage;
-          f->is_evictable = true;
-          f->owner_thread = thread_current();
-
-          fault_page->frame_addr = kpage;
-
-          // Read from corresponding disk file.
-          /*
-          printf(
-              "SPT_search hit: %p → frame_addr = %p, is_swapped = %d, swap_i = "
-              "%zu\n",
-              fault_page_addr, fault_page->frame_addr, fault_page->is_swapped,
-              fault_page->swap_i);
-              */
-
-          SD_read(swap_i, kpage);
-          fault_page->is_swapped = false;
-          // memset(kpage + page_read_bytes, 0, page_zero_bytes);
-          bool ok = pagedir_set_page(thread_current()->pagedir, upage, kpage,
-                                     writable);
-          if (!ok) {
-            printf("Failed!: pagedir_set_page in thread: %s\n", thread_name());
-          }
-          return;
-        }
-
-        break;
-
-      case FOR_STACK:
-        if (!fault_page->is_swapped) {
-          // This case should've covered by !fault_page check.
-          // I have no idea. Let's just pray.
-
-          // Allocate frame.
-          uint8_t* kpage = frame_alloc(PAL_USER, false);
-          fault_page->frame_addr = kpage;
-
-          // Setup stack.
-          pagedir_set_page(thread_current()->pagedir, upage, kpage, writable);
-          thread_current()->esp = fault_addr;
-          return;
-
-        } else {
-          // Page is in the swap disk.
-          size_t swap_i = fault_page->swap_i;
-
-          // Allocate frame
-          uint8_t* kpage = frame_alloc(PAL_USER, false);
-          struct frame* f = find_frame(kpage);
-          f->page_addr = upage;
-          f->is_evictable = true;
-          f->owner_thread = thread_current();
-
-          fault_page->frame_addr = kpage;
-          fault_page->is_swapped = false;
-
-          // Read from corresponding disk file.
-          // printf("Stack reading swap disk\n");
-          SD_read(swap_i, kpage);
-
-          pagedir_set_page(thread_current()->pagedir, upage, kpage, writable);
-          thread_current()->esp = fault_addr;
-          return;
-        }
-        break;
-
-      case FOR_MMAP:
-        /* TEMPORARILY COPIED FROM `FOR_FILE` */
-        if (!fault_page->is_swapped) {
-          // Repeat load_segment
-          file_seek(file, ofs);
-          uint8_t* kpage = frame_alloc(PAL_USER, true);
-
-          struct frame* f = find_frame(kpage);
-          f->page_addr = upage;
-          f->is_evictable = true;
-          f->owner_thread = thread_current();
-
-          fault_page->frame_addr = kpage;
-          fault_page->is_swapped = false;
-
-          off_t n = file_read(file, kpage, page_read_bytes);
-          if (n != (int)page_read_bytes) {
-            // printf("File read error\n");
-            frame_free(kpage);
-            exit(-1);
-          }
-          memset(kpage + page_read_bytes, 0, page_zero_bytes);
-
-          bool ok = pagedir_set_page(thread_current()->pagedir, upage, kpage,
-                                     writable);
-          if (!ok) {
-            printf("Failed!: pagedir_set_page in thread: %s\n", thread_name());
-          }
-
-          return;
-
-        } else {
-          // FIXME: Page is in the swap disk.
-          size_t swap_i = fault_page->swap_i;
-
-          // Repeat load_segment
-          file_seek(file, ofs);
-          uint8_t* kpage = frame_alloc(PAL_USER, true);
-          // if (!kpage) printf("Your frame_alloc is trash\n");
-          struct frame* f = find_frame(kpage);
-          f->page_addr = upage;
-          f->is_evictable = true;
-          f->owner_thread = thread_current();
-
-          fault_page->frame_addr = kpage;
-
-          // Read from corresponding disk file.
-          /*
-          printf(
-              "SPT_search hit: %p → frame_addr = %p, is_swapped = %d, swap_i = "
-              "%zu\n",
-              fault_page_addr, fault_page->frame_addr, fault_page->is_swapped,
-              fault_page->swap_i);
-              */
-
-          SD_read(swap_i, kpage);
-          fault_page->is_swapped = false;
-          // memset(kpage + page_read_bytes, 0, page_zero_bytes);
-          bool ok = pagedir_set_page(thread_current()->pagedir, upage, kpage,
-                                     writable);
-          if (!ok) {
-            printf("Failed!: pagedir_set_page in thread: %s\n", thread_name());
-          }
-          return;
-        }
-        break;
-
-      default:
-        printf("You reached the undefined purpose\n");
+      off_t n = file_read(file, kpage, page_read_bytes);
+      if (n != (int)page_read_bytes) {
+        // printf("File read error\n");
+        frame_free(kpage);
         exit(-1);
+      }
+      memset(kpage + page_read_bytes, 0, page_zero_bytes);
+
+      bool ok = pagedir_set_page(thread_current()->pagedir, upage, kpage,
+                                  writable);
+      if (!ok) {
+        printf("Failed!: pagedir_set_page in thread: %s\n", thread_name());
+      }
+
+      return;
+
+    } else {
+      // FIXME: Page is in the swap disk.
+      size_t swap_i = fault_page->swap_i;
+
+      // Repeat load_segment
+      file_seek(file, ofs);
+      uint8_t* kpage = frame_alloc(PAL_USER, true);
+      // if (!kpage) printf("Your frame_alloc is trash\n");
+      struct frame* f = find_frame(kpage);
+      f->page_addr = upage;
+      f->is_evictable = true;
+      f->owner_thread = thread_current();
+
+      fault_page->frame_addr = kpage;
+
+      // Read from corresponding disk file.
+      /*
+      printf(
+          "SPT_search hit: %p → frame_addr = %p, is_swapped = %d, swap_i = "
+          "%zu\n",
+          fault_page_addr, fault_page->frame_addr, fault_page->is_swapped,
+          fault_page->swap_i);
+          */
+
+      SD_read(swap_i, kpage);
+      fault_page->is_swapped = false;
+      // memset(kpage + page_read_bytes, 0, page_zero_bytes);
+      bool ok = pagedir_set_page(thread_current()->pagedir, upage, kpage,
+                                  writable);
+      if (!ok) {
+        printf("Failed!: pagedir_set_page in thread: %s\n", thread_name());
+      }
+      return;
     }
   }
 
