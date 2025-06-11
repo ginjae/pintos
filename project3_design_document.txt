@@ -87,16 +87,16 @@ struct page {
 	 find_frame function searches the frame table with frame's address
 	 as a key for search.
 
-	In our design, if page do exist in the memory, then it's address for frame 
-	should be unique per page. Because of that, searching the frame table using
-	only the frame's address is enough.
+	 In our design, if a page is in the memory, then it's address for frame 
+	 should be unique per page. Because of that, searching the frame table using
+	 only the frame's address is enough.
 
 >> A3: How does your code coordinate accessed and dirty bits between
 >> kernel and user virtual addresses that alias a single frame, or
 >> alternatively how do you avoid the issue?
 
 -> During the eviction, we access the "accessed" bit by calling
-	pagedir_is_accessed() to the frame's address. In the dirty bit case,
+	pagedir_is_accessed() to the page's address. In the dirty bit case,
 	we impose more strict criterion and call pagedir_is_dirty() to
 	not only the frame's address but also the corresponding user page address
 	(upage). This allows us to check that if the page is accessed / dirty.
@@ -107,9 +107,9 @@ struct page {
 >> how are races avoided?
 
 -> As mentioned in above, static lock frame_lock is declared & used during
-	pushing the new frame into the frame table & finding a victim.
-	This prevents the potential race condition by allowing at most one process
-	to alter the frame table at the same time.
+	 pushing the new frame into the frame table & finding a victim.
+	 This prevents the potential race condition by allowing at most one process
+	 to alter the frame table at the same time.
 
 ---- RATIONALE ----
 
@@ -117,14 +117,14 @@ struct page {
 >> representing virtual-to-physical mappings?
 
 -> Most of the page's members are determined from the arguments of
-	the load_segment() function in process.c. That way, we can store 
-	informations that are passed by the loader during the load phase.
+	 the load_segment() function in process.c. That way, we can store 
+	 informations that are passed by the loader during the load phase.
 
-	We defined frame's member so that it can store informations that 
-	is required for searching its corresponding SPT entry. It contains 
-	its frame's address, corresponding page address, its owner_thread
-	that contains the process's SPT, and the boolean is_evictable for
-	find_frame function to use while deciding the victim frame to evict.
+	 We defined frame's member so that it can store informations that 
+	 is required for searching its corresponding SPT entry. It contains 
+	 its frame's address, corresponding page address, its owner_thread
+	 that contains the process's SPT, and the boolean is_evictable for
+	 find_frame function to use while deciding the victim frame to evict.
 
 		       PAGING TO AND FROM DISK
 		       =======================
@@ -220,9 +220,9 @@ struct page {
 	another operation that requires another lock. This prevents Circular
 	wait from happening.
 	
-	In fact, we don't use any lock during the SPT operation
-	since SPT is per-process data structure so we don't have to consider any
-	race condition for SPT, at least in this implementation.
+	In fact, we don't use any lock during the SPT operation since SPT is 
+	per-process data structure so we don't have to consider any race 
+	condition for SPT, at least in this implementation.
 
 >> B6: A page fault in process P can cause another process Q's frame
 >> to be evicted.  How do you ensure that Q cannot access or modify
@@ -242,7 +242,7 @@ struct page {
 	 independent to the frame that process P is evicting. Otherwise process Q
 	 must wait for find_victim to finish before getting a new frame.
 
-	 Either way, no race condition occurred.
+	 Either way, race condition is prevented.
 
 >> B7: Suppose a page fault in process P causes a page to be read from
 >> the file system or swap.  How do you ensure that a second process Q
