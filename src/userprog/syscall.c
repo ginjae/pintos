@@ -193,7 +193,7 @@ int mmap(int fd, void* addr) {
   if (len == 0) return -1;
   // The range of pages mapped overlaps any exisitng set of mapped pages -> fail
   if (find_mapping_addr(&t->mmap_table, addr) != NULL) return -1;
-  if (addr >= PHYS_BASE - PGSIZE || addr <= t->data_segment_start) return -1;
+  if (addr >= PHYS_BASE - 0x800000 || addr <= t->data_segment_start) return -1;
 
   // Insert mapping to mmap_table
   struct mapping* m = malloc(sizeof(struct mapping));
@@ -201,7 +201,6 @@ int mmap(int fd, void* addr) {
   m->addr = addr;
   m->size = len;
   m->file = file_reopen(f);
-  m->fd = fd;
   list_init(&m->pages);
   list_push_back(&t->mmap_table, &m->elem);
 

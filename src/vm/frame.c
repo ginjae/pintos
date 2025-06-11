@@ -140,7 +140,8 @@ void swap_frame(struct frame* victim) {
       break;
 
     case FOR_MMAP:
-      if (pagedir_is_dirty(owner->pagedir, page_addr)) {
+      if (pagedir_is_dirty(owner->pagedir, page_addr) ||
+          pagedir_is_dirty(owner->pagedir, frame_addr)) {
         file_write_at(page->page_file, frame_addr, PGSIZE, page->ofs);
         pagedir_set_dirty(owner->pagedir, page_addr, false);
       }
@@ -206,8 +207,7 @@ void frame_free(void* kpage) {
   struct list_elem* e;
   struct frame* f;
 
-  if (!lock_held_by_current_thread(&frame_lock))
-    lock_acquire(&frame_lock);
+  lock_acquire(&frame_lock);
 
   if (list_empty(&frame_table)) {
     lock_release(&frame_lock);

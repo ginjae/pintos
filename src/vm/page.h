@@ -45,7 +45,7 @@ struct page {
   size_t zero_bytes;       // size of remaining page (should be zeroed)
 
   struct hash_elem SPT_elem;  // hash elem for hash SPT
-  struct list_elem MMAP_elem; // list elem for MMAP mapping
+  struct list_elem MMAP_elem; /* list elem for MMAP mapping */
 };
 
 // Initialize list object named frame_table. Call this in load()!
