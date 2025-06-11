@@ -29,6 +29,13 @@ Munseong Son <osoli6949@unist.ac.kr>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+
+// in thread.h (as a member of the struct thread)
+struct hash SPT; // supplement page table (per process.)
+
+
+// in frame.c & frame.h:
+
 struct frame {
   void* frame_addr;              // allocated frame's address. (=kpage)
   void* page_addr;               // virtual address pointing to page. (=upage)
@@ -43,14 +50,15 @@ static struct list frame_table;
 /* Lock for frame_alloc, which is critical section. */
 static struct lock frame_lock;
 
-struct hash SPT; /* PER-PROCESS SPT */ (struct thread's member.)
+
+// in page.c & page.h:
 
 // enums for specifying page's purpose
 enum page_purpose { FOR_FILE = 0, FOR_STACK = 1, FOR_MMAP = 2 };
 
 struct page {
-  void *page_addr;   // upage
-  void *frame_addr;  // kpage
+  void *page_addr;   // address for user virtual space
+  void *frame_addr;  // address for kernel virtual space
 
   bool is_writable;  // is writing on this page allowed?
   size_t swap_i;     // index for swap disk (swapped page end up there)
@@ -67,52 +75,56 @@ struct page {
   struct list_elem MMAP_elem; /* list elem for MMAP mapping */
 };
 
+
+
 ---- ALGORITHMS ----
 
 >> A2: In a few paragraphs, describe your code for locating the frame,
 >> if any, that contains the data of a given page.
 
-Our find_frame function searches the frame table with frame's address
-(given by the palloc_get_page()) as a key for search.
+-> We search SPT using the page address provided by user. Then we acquire
+	 the page's frame address from returned SPT enrty. After that, our 
+	 find_frame function searches the frame table with frame's address
+	 as a key for search.
 
-In our design, if page do exist in the memory, then it's address for frame 
-should be unique per page. Because of that, searching the frame table using
-only the frame's address is enough.
+	In our design, if page do exist in the memory, then it's address for frame 
+	should be unique per page. Because of that, searching the frame table using
+	only the frame's address is enough.
 
 >> A3: How does your code coordinate accessed and dirty bits between
 >> kernel and user virtual addresses that alias a single frame, or
 >> alternatively how do you avoid the issue?
 
-During the eviction, we access the "accessed" bit by calling
-pagedir_is_accessed() to the frame's address. In the dirty bit case,
-we impose more strict criterion and call pagedir_is_dirty() to
-not only the frame's address but also the corresponding user page address
-(upage). This allows us to check that if the page is accessed / dirty.
+-> During the eviction, we access the "accessed" bit by calling
+	pagedir_is_accessed() to the frame's address. In the dirty bit case,
+	we impose more strict criterion and call pagedir_is_dirty() to
+	not only the frame's address but also the corresponding user page address
+	(upage). This allows us to check that if the page is accessed / dirty.
 
 ---- SYNCHRONIZATION ----
 
 >> A4: When two user processes both need a new frame at the same time,
 >> how are races avoided?
 
-As mentioned in above, static lock frame_lock is declared & used during
-pushing the new frame into the frame table & finding a victim.
-This prevents the potential race condition by allowing at most one process
-to alter the frame table at the same time.
+-> As mentioned in above, static lock frame_lock is declared & used during
+	pushing the new frame into the frame table & finding a victim.
+	This prevents the potential race condition by allowing at most one process
+	to alter the frame table at the same time.
 
 ---- RATIONALE ----
 
 >> A5: Why did you choose the data structure(s) that you did for
 >> representing virtual-to-physical mappings?
 
-Most of the page's members are determined from the arguments of
-the load_segment() function in process.c. That way, we can store 
-informations that are passed by the loader during the load phase.
+-> Most of the page's members are determined from the arguments of
+	the load_segment() function in process.c. That way, we can store 
+	informations that are passed by the loader during the load phase.
 
-We defined frame's member so that it can store informations that 
-is required for searching its corresponding SPT entry. It contains 
-its frame's address, corresponding page address, its owner_thread
-that contains the process's SPT, and the boolean is_evictable for
-find_frame function to use while deciding the victim frame to evict.
+	We defined frame's member so that it can store informations that 
+	is required for searching its corresponding SPT entry. It contains 
+	its frame's address, corresponding page address, its owner_thread
+	that contains the process's SPT, and the boolean is_evictable for
+	find_frame function to use while deciding the victim frame to evict.
 
 		       PAGING TO AND FROM DISK
 		       =======================
@@ -123,18 +135,71 @@ find_frame function to use while deciding the victim frame to evict.
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+1. static struct block *swap_disk;
+-> Swap disk with the data type block.
+	 it is a block for swap disk, which is initialized during init().
+
+
+2. static struct bitmap *disk_map;
+-> Mapping of swap disk. false: empty, true: filled.
+   It represents the current status of the swap_disk.
+   swap_i member of the struct page originates here.
+
+
+3. static struct lock swap_lock;
+-> Lock for synchronization during the swap.
+
 ---- ALGORITHMS ----
 
 >> B2: When a frame is required but none is free, some frame must be
 >> evicted.  Describe your code for choosing a frame to evict.
 
+-> victim frame that is going to be evicted is chosen using the function
+	 called find_victim(), which utilizes the second chance algorithm.
+	 
+	 In a nutshell, second chance algorithm utilizes "clock hand" (ft_cursor)
+	 to find a frame to evict. If the frame that is pointed by the ft_cursor
+	 is recently accessed (i.e. pagedir_is_accessed() returns true), then
+	 function sets that frame's access bit to false & moves cursor to the next frame.
+	 Otherwise, it returns the corresponding victim frame after moving cursor.
+
+	 in frame_alloc(), find_victim() is called if the initial palloc_get_page()
+	 fails. After the evicted frame is removed from the frame table, swap_frame()
+	 is called, which writes the frame's data to the swap disk using the block_write()
+	 and update the status of the disk by flipping corresponding bits in the disk_map.
+
+	 Except, if the evicted frame's page is allocated for the mmap, then instead of
+	 writing to the swap disk, it writes directly to its file (which is pointed by
+	 the page's member, page_file.) using stored offset value in the page.
+
+	 Frame for initial stack allocation is not a target for eviction, as we set
+	 its is_evictable boolean to false. While loop during the find_victim() function
+	 skips the frame if the frame's is_evictable is false.
+
+
 >> B3: When a process P obtains a frame that was previously used by a
 >> process Q, how do you adjust the page table (and any other data
 >> structures) to reflect the frame Q no longer has?
 
+-> In our implementation, such situation only occurs in case of swapping.
+	 For the swapped frame's page, we call pagedir_clear_page() so that 
+	 if process Q tries to access that page again, page fault occurs.
+
+	 We also update the boolean in that page, is_swapped, to true so that
+	 process Q can search SPT to find out that its frame is swapped. In
+	 that case, process Q can access the swap_disk and read its swapped frame.
+
 >> B4: Explain your heuristic for deciding whether a page fault for an
 >> invalid virtual address should cause the stack to be extended into
 >> the page that faulted.
+
+-> If page fault occurred and yet there is no SPT for the faulted address
+	 and the faulted address is valid, we assume that the fault is caused by 
+	 the stack growth attempt.
+
+	 If that faulted address is within the stack limit(that is, the address
+	 is at least bigger than PHYS_BASE - 8MB), our page fault function allocates
+	 new frame for the faulted address's page and push new entry for the SPT.
 
 ---- SYNCHRONIZATION ----
 
@@ -143,21 +208,63 @@ find_frame function to use while deciding the victim frame to evict.
 >> textbook for an explanation of the necessary conditions for
 >> deadlock.)
 
+-> Deadlock occurs iff the following four conditions hold simultaneously:
+
+	1. Mutual exclusion
+	2. Hold and wait
+	3. No preemption
+	4. Circular wait
+
+	We prevent deadlock by implementing only one lock per data structure,
+	and not calling the operation that requires lock if we already calling
+	another operation that requires another lock. This prevents Circular
+	wait from happening.
+	
+	In fact, we don't use any lock during the SPT operation
+	since SPT is per-process data structure so we don't have to consider any
+	race condition for SPT, at least in this implementation.
+
 >> B6: A page fault in process P can cause another process Q's frame
 >> to be evicted.  How do you ensure that Q cannot access or modify
 >> the page during the eviction process?  How do you avoid a race
 >> between P evicting Q's frame and Q faulting the page back in?
+
+-> find_victim function acquires frame_lock at the start of the process
+	 and releases the lock after finding the victim to evict. Therefore,
+	 only one find_victim can happen simultaneously.
+
+	 If process Q tries to access the evicted frame, it causes page fault
+	 since the corresponding page entry is cleared by pagedir_clear_page().
+	 So process Q requests a new frame by calling frame_alloc(), which
+	 calls palloc_get_page().
+
+	 If palloc_get_page() succeeds, process Q earns a new frame that is 
+	 independent to the frame that process P is evicting. Otherwise process Q
+	 must wait for find_victim to finish before getting a new frame.
+
+	 Either way, no race condition occurred.
 
 >> B7: Suppose a page fault in process P causes a page to be read from
 >> the file system or swap.  How do you ensure that a second process Q
 >> cannot interfere by e.g. attempting to evict the frame while it is
 >> still being read in?
 
+-> During page fault, we first allocate new frame with is_evictable = false.
+	 If the read is complete, then we set is_evictable = true. This way, we 
+	 can prevent find_victim from evicting a frame that is reading 
+	 something from a file or a swap disk.
+
 >> B8: Explain how you handle access to paged-out pages that occur
 >> during system calls.  Do you use page faults to bring in pages (as
 >> in user programs), or do you have a mechanism for "locking" frames
 >> into physical memory, or do you use some other design?  How do you
 >> gracefully handle attempted accesses to invalid virtual addresses?
+
+-> We prevent access by using pagedir_clear_page() so that any future
+   access to that page will cause a page fault.
+
+	 If the virtual address itself is invalid, we use system call exit(-1)
+	 to prevent such access from happening.
 
 ---- RATIONALE ----
 
@@ -167,6 +274,16 @@ find_frame function to use while deciding the victim frame to evict.
 >> possibility for deadlock but allows for high parallelism.  Explain
 >> where your design falls along this continuum and why you chose to
 >> design it this way.
+
+-> We choose the "best of both worlds" approach by implementing a single
+	 lock, frame_lock, and a boolean, is_evictable. Using a lock, we force
+	 processes to evict frame only one at a time, while not allowing a frame
+	 to be evicted if the frame is reading something by setting is_evictable
+	 false during the read. This way, we can avoid multiple cases of race
+	 conditions while not worring about the potential deadlock.
+
+	 Also, swap_lock is acquired & released only in the operations that does
+	 not require frame_lock.
 
 			 MEMORY MAPPED FILES
 			 ===================
@@ -257,8 +374,6 @@ find_frame function to use while deciding the victim frame to evict.
 			     CONTRIBUTION
 			     ============
 
-Jaemin Kim (__%): 
+Jaemin Kim (50%) / Munseong Son (50%)
 
-Munseong Son (__%): 
-
--> __:__ contribution.
+-> 50:50 contribution.

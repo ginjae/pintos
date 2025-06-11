@@ -191,7 +191,7 @@ static void page_fault(struct intr_frame* f) {
     if (fault_addr <= PHYS_BASE - 0x800000) exit(-1);
 
     if (fault_addr >= esp - 32) {
-      void* kpage = frame_alloc(PAL_USER | PAL_ZERO, false);
+      void* kpage = frame_alloc(PAL_USER | PAL_ZERO, true);
       struct frame* f = find_frame(kpage);
       f->is_evictable = true;
       f->owner_thread = thread_current();
@@ -225,15 +225,7 @@ static void page_fault(struct intr_frame* f) {
     if (!fault_page->is_swapped) {
       // Repeat load_segment
       file_seek(file, ofs);
-      uint8_t* kpage = frame_alloc(PAL_USER, true);
-
-      struct frame* f = find_frame(kpage);
-      f->page_addr = upage;
-      f->is_evictable = true;
-      f->owner_thread = thread_current();
-
-      fault_page->frame_addr = kpage;
-      fault_page->is_swapped = false;
+      uint8_t* kpage = frame_alloc(PAL_USER, false);
 
       off_t n = file_read(file, kpage, page_read_bytes);
       if (n != (int)page_read_bytes) {
@@ -243,8 +235,16 @@ static void page_fault(struct intr_frame* f) {
       }
       memset(kpage + page_read_bytes, 0, page_zero_bytes);
 
-      bool ok = pagedir_set_page(thread_current()->pagedir, upage, kpage,
-                                  writable);
+      fault_page->frame_addr = kpage;
+      fault_page->is_swapped = false;
+
+      struct frame* f = find_frame(kpage);
+      f->page_addr = upage;
+      f->is_evictable = true;
+      f->owner_thread = thread_current();
+
+      bool ok =
+          pagedir_set_page(thread_current()->pagedir, upage, kpage, writable);
       if (!ok) {
         printf("Failed!: pagedir_set_page in thread: %s\n", thread_name());
       }
@@ -257,14 +257,8 @@ static void page_fault(struct intr_frame* f) {
 
       // Repeat load_segment
       file_seek(file, ofs);
-      uint8_t* kpage = frame_alloc(PAL_USER, true);
+      uint8_t* kpage = frame_alloc(PAL_USER, false);
       // if (!kpage) printf("Your frame_alloc is trash\n");
-      struct frame* f = find_frame(kpage);
-      f->page_addr = upage;
-      f->is_evictable = true;
-      f->owner_thread = thread_current();
-
-      fault_page->frame_addr = kpage;
 
       // Read from corresponding disk file.
       /*
@@ -276,10 +270,16 @@ static void page_fault(struct intr_frame* f) {
           */
 
       SD_read(swap_i, kpage);
+      fault_page->frame_addr = kpage;
       fault_page->is_swapped = false;
       // memset(kpage + page_read_bytes, 0, page_zero_bytes);
-      bool ok = pagedir_set_page(thread_current()->pagedir, upage, kpage,
-                                  writable);
+
+      struct frame* f = find_frame(kpage);
+      f->page_addr = upage;
+      f->is_evictable = true;
+      f->owner_thread = thread_current();
+      bool ok =
+          pagedir_set_page(thread_current()->pagedir, upage, kpage, writable);
       if (!ok) {
         printf("Failed!: pagedir_set_page in thread: %s\n", thread_name());
       }
