@@ -29,24 +29,90 @@ Munseong Son <osoli6949@unist.ac.kr>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+struct frame {
+  void* frame_addr;              // allocated frame's address. (=kpage)
+  void* page_addr;               // virtual address pointing to page. (=upage)
+  struct thread* owner_thread;   // Process(thread) who owns this frame
+  struct list_elem ftable_elem;  // list element for frame table list
+  bool is_evictable;             // true iff the corresponding SPT exists.
+};
+
+/* Frame table that keeps track of all available frames. */
+static struct list frame_table;
+
+/* Lock for frame_alloc, which is critical section. */
+static struct lock frame_lock;
+
+struct hash SPT; /* PER-PROCESS SPT */ (struct thread's member.)
+
+// enums for specifying page's purpose
+enum page_purpose { FOR_FILE = 0, FOR_STACK = 1, FOR_MMAP = 2 };
+
+struct page {
+  void *page_addr;   // upage
+  void *frame_addr;  // kpage
+
+  bool is_writable;  // is writing on this page allowed?
+  size_t swap_i;     // index for swap disk (swapped page end up there)
+  bool is_swapped;   // true if this page is in swap_disk, false otherwise.
+  enum page_purpose purpose;  // Purpose for this page
+
+  /* File-related members */
+  struct file *page_file;  // file for read (if purpose == FOR_FILE)
+  off_t ofs;               // file offset.
+  size_t read_bytes;       // size of read bytes.
+  size_t zero_bytes;       // size of remaining page (should be zeroed)
+
+  struct hash_elem SPT_elem;  // hash elem for hash SPT
+  struct list_elem MMAP_elem; /* list elem for MMAP mapping */
+};
+
 ---- ALGORITHMS ----
 
 >> A2: In a few paragraphs, describe your code for locating the frame,
 >> if any, that contains the data of a given page.
 
+Our find_frame function searches the frame table with frame's address
+(given by the palloc_get_page()) as a key for search.
+
+In our design, if page do exist in the memory, then it's address for frame 
+should be unique per page. Because of that, searching the frame table using
+only the frame's address is enough.
+
 >> A3: How does your code coordinate accessed and dirty bits between
 >> kernel and user virtual addresses that alias a single frame, or
 >> alternatively how do you avoid the issue?
+
+During the eviction, we access the "accessed" bit by calling
+pagedir_is_accessed() to the frame's address. In the dirty bit case,
+we impose more strict criterion and call pagedir_is_dirty() to
+not only the frame's address but also the corresponding user page address
+(upage). This allows us to check that if the page is accessed / dirty.
 
 ---- SYNCHRONIZATION ----
 
 >> A4: When two user processes both need a new frame at the same time,
 >> how are races avoided?
 
+As mentioned in above, static lock frame_lock is declared & used during
+pushing the new frame into the frame table & finding a victim.
+This prevents the potential race condition by allowing at most one process
+to alter the frame table at the same time.
+
 ---- RATIONALE ----
 
 >> A5: Why did you choose the data structure(s) that you did for
 >> representing virtual-to-physical mappings?
+
+Most of the page's members are determined from the arguments of
+the load_segment() function in process.c. That way, we can store 
+informations that are passed by the loader during the load phase.
+
+We defined frame's member so that it can store informations that 
+is required for searching its corresponding SPT entry. It contains 
+its frame's address, corresponding page address, its owner_thread
+that contains the process's SPT, and the boolean is_evictable for
+find_frame function to use while deciding the victim frame to evict.
 
 		       PAGING TO AND FROM DISK
 		       =======================
