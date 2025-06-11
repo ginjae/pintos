@@ -110,15 +110,64 @@ Munseong Son <osoli6949@unist.ac.kr>
 >> C1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+-> 	This 'struct mapping' is defined in 'vm/mmap.h' and used for process to maintain
+	its 'mmap_table'.
+	It should have
+		1. a mapping 'id' that is unique in the 'mmap_table',
+		2. the virtual address that mapped pages start from,
+		3. the length of mapped file,
+	4. the file pointer of mapped file,
+	5. list element for 'mmap_table' of the owner process,
+	6. list of pages (SPT entry) that the mapping allocated
+	struct mapping {
+		int id;                 /* Mapping id */
+		void *addr;             /* Starting virtual address to store */
+		int32_t size;           /* File length */
+		struct file *file;      /* Target file */
+		struct list_elem elem;  /* List element for mmap_table in process */
+		struct list pages;      /* List of pages that the mapping allocated */
+	};
+
+	struct thread {
+		...
+		#ifdef USERPROG
+	struct list mmap_table;   /* List of mappings (mmap table) */
+	void* data_segment_start; /* Pointer to the starting point of data segment */
+	#endif
+	}
+	: The member 'struct list mmap_table' is for per-process mmap table which
+	stores mappings of memory mapped files that the process has.
+	The member 'data_segment_start' stores the starting virtual address of data segment
+	of the process, and it has the value when the loading succeeds. It is used for 
+	checking that the argument address in mmap system call is above the data segment.
+
+	struct page {
+		...
+	struct list_elem MMAP_elem; /* list elem for MMAP mapping */
+	};
+	: The member 'struct list_elem MMAP_elem' is added to get in the list of pages that
+	is owned by mmap mapping.
 
 ---- ALGORITHMS ----
 
 >> C2: Describe how memory mapped files integrate into your virtual
 >> memory subsystem.  Explain how the page fault and eviction
 >> processes differ between swap pages and other pages.
+-> 	Memory mapped files directly map virtual memory to file contents using
+	supplemental page table (SPT), but it marks the SPT entry as "FOR_MMAP" and
+	pushes the entry into the list of pages in the mapping. It inserts SPT entry
+	into the SPT when mmap system call is invoked. If the page fault occurs,
+	then the handler lazy-loads from the corresponding file instead of swap slots.
+	The frames allocated by mmap could be evicted in the same way as other evictable
+	frame, but the pages and SPT entries by mmap are freed when 'munmap' is called or
+	the owner process terminates.
 
 >> C3: Explain how you determine whether a new file mapping overlaps
 >> any existing segment.
+->	First, our implementation checks that the address received is below
+	stack (PHYS_BASE - 0x800000) and above starting address of data segment.
+	Then, we check the new mapping would overlap any existing set of mapped pages
+	by 'find_mapping_addr' function which searches mapping in certain virtual address.
 
 ---- RATIONALE ----
 
@@ -128,6 +177,16 @@ Munseong Son <osoli6949@unist.ac.kr>
 >> that much of their implementation can be shared.  Explain why your
 >> implementation either does or does not share much of the code for
 >> the two situations.
+->	We implement SPT entry to have enum member for its purpose (FOR_FILE, 
+	FOR_SWAP, and FOR_MMAP). Therefore, the SPT entries created by mmap mappings
+	are distinguished from SPT entries that should be swapped with disk, which
+	leads only SPT entries made by mmap mappings to write-back directly to the
+	corresponding file. Therefore, the two cases do not share much code, while
+	they are handled in the same function when only considering the frame eviction.
+	More about mmap mapping, when 'munmap' system calls are invoked manually or
+	when the owner process terminates, write-back process should be independently
+	implemented in 'munmap' system call function.
+
 
 			     CONTRIBUTION
 			     ============
